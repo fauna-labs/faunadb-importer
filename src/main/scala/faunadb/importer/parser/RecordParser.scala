@@ -5,14 +5,14 @@ import faunadb.importer.lang._
 import faunadb.importer.values._
 
 private[parser] object RecordParser {
-  def parse(input: => Stream[Result[Value]])(implicit context: Context): Stream[Result[Record]] =
+  def parse(input: Iterator[Result[Value]])(implicit context: Context): Iterator[Result[Record]] =
     new RecordParser(input, context).parse()
 }
 
-private class RecordParser(input: => Stream[Result[Value]], context: Context) {
+private class RecordParser(input: Iterator[Result[Value]], context: Context) {
   private type RN[A] = (A, Int)
 
-  def parse(): Stream[Result[Record]] = {
+  def parse(): Iterator[Result[Record]] = {
     val withIds = context.idField
       .map(id => input.map(findId(id, _)))
       .getOrElse(generateRownum(input))
@@ -25,8 +25,8 @@ private class RecordParser(input: => Stream[Result[Value]], context: Context) {
   private def findId(idField: String, value: Result[Value]): Result[(String, Value)] =
     value flatMap (v => getScalarField(idField, v) map (_.raw -> v))
 
-  private def generateRownum(stream: => Stream[Result[Value]]): Stream[Result[(String, Value)]] =
-    stream.zip(Stream.iterate(1L)(_ + 1)) map { case (value, id) =>
+  private def generateRownum(values: Iterator[Result[Value]]): Iterator[Result[(String, Value)]] =
+    values.zip(Iterator.iterate(1L)(_ + 1)) map { case (value, id) =>
       value map (id.toString -> _)
     }
 

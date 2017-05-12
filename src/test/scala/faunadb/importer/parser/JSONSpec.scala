@@ -2,17 +2,17 @@ package faunadb.importer.parser
 
 import faunadb.importer.lang._
 import faunadb.importer.values._
-import faunadb.specs._
-import scala.language.implicitConversions
 
-class JSONSpec extends ContextSpec with IOReaderUtils {
+class JSONSpec extends ParserSpec {
+
+  val parser = JSON
 
   "The JSON parser" should "parse an empty source" in {
-    JSON.parse("") shouldBe empty
+    parse("") shouldBe empty
   }
 
   it should "parse fields from an object" in {
-    JSON.parse(
+    parse(
       """
         |{
         |   "name": "bob",
@@ -54,7 +54,7 @@ class JSONSpec extends ContextSpec with IOReaderUtils {
   }
 
   it should "parse multiple objects" in {
-    JSON.parse(
+    parse(
       """
         |{ "a": "b" }
         |{ "c": "d" }
@@ -66,14 +66,14 @@ class JSONSpec extends ContextSpec with IOReaderUtils {
   }
 
   it should "parse multiple objects in the same line" in {
-    JSON.parse("""{ "a": "b" }{ "c": "d" }""") should contain only (
+    parse("""{ "a": "b" }{ "c": "d" }""") should contain only (
       Ok(Object(Pos(1, 1), "a" -> Scalar(Pos(1, 8), StringT, "b"))),
       Ok(Object(Pos(1, 13), "c" -> Scalar(Pos(1, 20), StringT, "d")))
     )
   }
 
   it should "fail on broken entries" in {
-    JSON.parse("""{ "a": b }{ "c": "d" }""") should contain only Err(
+    parse("""{ "a": b }{ "c": "d" }""") should contain only Err(
       "Invalid JSON entry at line: 1, column: 9. " +
         "Unrecognized token 'b': was expecting ('true', 'false' or 'null')"
     )
@@ -82,8 +82,8 @@ class JSONSpec extends ContextSpec with IOReaderUtils {
   it should "be able to skip array" in {
     val skipArray = context.copy(skipRootElement = true)
 
-    JSON.parse("""[]""")(skipArray) shouldBe empty
-    JSON.parse("""[{ "a": "b" }, { "c": "d" }]""")(skipArray) should contain only (
+    parse("""[]""")(skipArray) shouldBe empty
+    parse("""[{ "a": "b" }, { "c": "d" }]""")(skipArray) should contain only (
       Ok(Object(Pos(1, 2), "a" -> Scalar(Pos(1, 9), StringT, "b"))),
       Ok(Object(Pos(1, 16), "c" -> Scalar(Pos(1, 23), StringT, "d")))
     )

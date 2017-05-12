@@ -45,27 +45,21 @@ private class Import(connPool: ConnectionPool) {
     forAll(filesToImport) { implicit c => InsertRecords(AkkaFaunaStream(connPool), idCache) }
   }
 
-  def forAll(files: Import.Input)(fn: Context => Phase) {
+  def forAll(files: Import.Input)(fn: Context => Phase[Record]) {
     files.foreach { case (file, context) =>
-      implicit val _ = context
-
       val phase = fn(context)
-      Log.info(s"${phase.desc} for $file")
+      Log.info(s"${phase.description} for $file")
 
-      InputParser(file) fold (
+      InputParser(file)(context) fold (
         error => throw new IllegalArgumentException(error),
-        parser => try runPhase(phase, parser.records()) finally parser.close()
+        parser => try runPhase(phase, parser.records())(context) finally parser.close()
       )
     }
   }
 
-  private def runPhase(phase: Phase, records: Stream[Result[Record]])(implicit c: Context) =
+  private def runPhase(phase: Phase[Record], records: Iterator[Result[Record]])(implicit c: Context) =
     Await.result(
-      phase.run(
-        ErrorHandler
-          .filter(records)
-          .map(_.get)
-      ),
+      phase.run(records.flatMap(ErrorHandler.handle(_))),
       Duration.Inf
     )
 }

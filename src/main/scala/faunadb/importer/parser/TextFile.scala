@@ -26,16 +26,16 @@ private[parser] object TSV extends TextFileParser {
 private sealed abstract class TextFileParser extends Parser {
   val name: String
   def parserFor(reader: Reader): CsvParser
-  def parse(reader: Reader)(implicit context: Context): Stream[Result[Value]] =
+  def parse(reader: Reader)(implicit context: Context): Iterator[Result[Value]] =
     new TextFile(name, parserFor(reader), context).parse()
 }
 
 private final class TextFile(ext: String, parser: CsvParser, context: Context) {
   import JsonToken._
 
-  def parse(): Stream[Result[Value]] =
-    Stream
-      .cons(read(first = true), Stream.continually(read()))
+  def parse(): Iterator[Result[Value]] =
+    Iterator
+      .iterate(read(first = true))(_ => read())
       .takeWhile(_ != null)
 
   private def read(first: Boolean = false): Result[Value] = {

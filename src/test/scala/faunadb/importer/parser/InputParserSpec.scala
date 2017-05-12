@@ -14,7 +14,7 @@ class InputParserSpec extends ContextSpec {
   val invalidFileName = new File("src/test/resources/blankfile")
 
   "The input parser" should "parse a JSON file" in {
-    InputParser(jsonFile).get.records() should contain only (
+    InputParser(jsonFile).get.records().toStream should contain only (
       Ok(
         Record("1", None, Object(Pos(1, 1),
           "name" -> Scalar(Pos(1, 11), StringT, "Bob D"),
@@ -35,7 +35,7 @@ class InputParserSpec extends ContextSpec {
       fieldsInOrder = Vector("name", "age")
     )
 
-    InputParser(csvFile)(csvContext).get.records() should contain only (
+    InputParser(csvFile)(csvContext).get.records().toStream should contain only (
       Ok(
         Record("1", None, Object(Pos(1, 1),
           "name" -> Scalar(Pos(1, 1), StringT, "Bob D"),

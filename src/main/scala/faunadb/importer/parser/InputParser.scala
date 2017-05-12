@@ -4,7 +4,7 @@ import faunadb.importer.config._
 import faunadb.importer.lang._
 import faunadb.importer.report._
 import faunadb.importer.values._
-import java.io.{ BufferedReader, File, FileReader }
+import java.io._
 
 object InputParser {
   private val FileType = ".*\\.(\\w+)$".r
@@ -24,9 +24,7 @@ object InputParser {
 }
 
 final class InputParser private(file: File, fileParser: Parser)(implicit c: Context) {
-  private val input =
-    MonitoredIOReader(new BufferedReader(new FileReader(file)))(Stats.BytesRead.inc)
-
-  def records(): Stream[Result[Record]] = RecordParser.parse(fileParser.parse(input))
+  private val input = MonitoredIOReader(new BufferedReader(new FileReader(file)))(Stats.BytesRead.inc)
+  def records(): Iterator[Result[Record]] = RecordParser.parse(fileParser.parse(input))
   def close(): Unit = input.close()
 }

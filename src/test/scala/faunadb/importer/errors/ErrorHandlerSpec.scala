@@ -16,20 +16,11 @@ class ErrorHandlerSpec extends ContextSpec {
   }
 
   "The error handler" should "handle result" in new NoStop {
-    ErrorHandler.check(Ok(1)) shouldBe false
-    ErrorHandler.check(Err("a error")) shouldBe true
-  }
-
-  it should "handle sequences" in new NoStop {
-    ErrorHandler.check(Seq(Ok(1), Ok(2))) shouldBe false
-    ErrorHandler.check(Seq(Ok(1), Err("an error"))) shouldBe true
-  }
-
-  it should "filter sequences" in new NoStop {
-    ErrorHandler.filter(Seq(Ok(1), Err("an error"), Ok(3))) shouldBe Seq(Ok(1), Ok(3))
+    ErrorHandler.handle(Ok(1)) shouldBe Some(1)
+    ErrorHandler.handle(Err("a error")) shouldBe None
   }
 
   it should "throw an error by default when an error is found" in {
-    the[ErrorHandler.Stop] thrownBy ErrorHandler.check(Err("an error")) should have message "an error"
+    the[ErrorHandler.Stop] thrownBy ErrorHandler.handle(Err("an error")) should have message "an error"
   }
 }

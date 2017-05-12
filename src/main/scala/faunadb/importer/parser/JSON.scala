@@ -8,7 +8,7 @@ import java.io.Reader
 import scala.collection.generic.CanBuildFrom
 
 private[parser] object JSON extends Parser {
-  def parse(reader: Reader)(implicit context: Context): Stream[Result[Value]] = {
+  def parse(reader: Reader)(implicit context: Context): Iterator[Result[Value]] = {
     val jsonFactory = new JsonFactory()
     new JSON(jsonFactory.createParser(reader), context).parse()
   }
@@ -17,9 +17,9 @@ private[parser] object JSON extends Parser {
 private final class JSON(parser: JsonParser, context: Context) {
   import JsonToken._
 
-  def parse(): Stream[Result[Value]] =
-    Stream
-      .cons(read(first = true), Stream.continually(read()))
+  def parse(): Iterator[Result[Value]] =
+    Iterator
+      .iterate(read(first = true))(_ => read())
       .takeWhile(_ != null)
 
   private def read(first: Boolean = false): Result[Value] = {
