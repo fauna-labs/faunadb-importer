@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="INFO" class="ch.qos.logback.core.FileAppender">
+        <file>logs/info.log</file>
+        <immediateFlush>false</immediateFlush>
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ERRORS" class="ch.qos.logback.core.FileAppender">
+        <file>logs/errors.log</file>
+        <immediateFlush>false</immediateFlush>
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FATAL" class="ch.qos.logback.core.FileAppender">
+        <file>logs/exceptions.log</file>
+        <immediateFlush>false</immediateFlush>
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="info" level="INFO">
+        <appender-ref ref="INFO"/>
+    </logger>
+
+    <logger name="fatal" level="ERROR" additivity="false">
+        <appender-ref ref="FATAL"/>
+    </logger>
+
+    <logger name="error" level="ERROR" additivity="false">
+        <appender-ref ref="ERRORS"/>
+    </logger>
+
+    <root level="off">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

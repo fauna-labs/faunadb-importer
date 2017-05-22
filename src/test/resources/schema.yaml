@@ -1,0 +1,20 @@
+src/test/resources/testdata.json:
+  class: data
+  skipRoot: true
+  tsField: created_at
+
+  fields:
+    - name: name
+      type: string
+
+    - name: age
+      type: long
+
+    - name: oldName
+      type: string
+      rename: newName
+
+  ignoredFields:
+    - a
+    - b
+    - c
