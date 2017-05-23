@@ -29,15 +29,16 @@ private final class HttpWrapper extends AsyncHttpClient(
     .setMaxRequestRetry(0)
     .build()
 ) {
+  override def prepareRequest(request: Request): AsyncHttpClient#BoundRequestBuilder =
+    super.prepareRequest(request).addHeader("User-Agent", "faunadb-importer")
+
   override def executeRequest[T](request: Request, handler: AsyncHandler[T]): ListenableFuture[T] =
     super.executeRequest(request, new LatencyMeasureHandler(handler))
 }
 
 private final class LatencyMeasureHandler[T](delegate: AsyncHandler[T]) extends AsyncHandler[T] {
-  private val Time = "X-Query-Time"
-
   def onHeadersReceived(headers: HttpResponseHeaders): STATE = {
-    headers.getHeaders.get(Time) foreach (time => Stats.ServerLatency.update(time.toLong, MILLISECONDS))
+    headers.getHeaders.get("X-Query-Time") foreach (time => Stats.ServerLatency.update(time.toLong, MILLISECONDS))
     delegate.onHeadersReceived(headers)
   }
 
