@@ -11,7 +11,8 @@ object Stats {
   val BytesToRead: Counter = reg.counter("bytes-to-read")
   val BytesRead: Counter = reg.counter("bytes-read")
   val ErrorsFound: Counter = reg.counter("errors-found")
-  val Latency: Timer = reg.timer("latency")
+  val ImportLatency: Timer = reg.timer("import-latency")
+  val ServerLatency: Timer = reg.timer("server-latency")
 }
 
 object StatsReporter {
@@ -34,8 +35,9 @@ object StatsReporter {
     val bytesToRead = Stats.BytesToRead.getCount
     val bytesRead = Stats.BytesRead.getCount
     val errors = Stats.ErrorsFound.getCount
-    val requests = Stats.Latency
-    val latency = Stats.Latency.getSnapshot
+    val requests = Stats.ImportLatency
+    val importLatency = Stats.ImportLatency.getSnapshot
+    val serverLatency = Stats.ServerLatency.getSnapshot
 
     val status = Seq(
       s"Errors: $errors",
@@ -50,10 +52,15 @@ object StatsReporter {
         f"${requests.getFiveMinuteRate}%.2f/" +
         f"${requests.getFifteenMinuteRate}%.2f",
 
-      "Latency(median/75%/95%): " +
-        f"${latency.getMedian * nanosToMills}%.2f/" +
-        f"${latency.get75thPercentile * nanosToMills}%.2f/" +
-        f"${latency.get95thPercentile() * nanosToMills}%.2f"
+      "Import latency(median/75%/95%): " +
+        f"${importLatency.getMedian * nanosToMills}%.2f/" +
+        f"${importLatency.get75thPercentile * nanosToMills}%.2f/" +
+        f"${importLatency.get95thPercentile() * nanosToMills}%.2f",
+
+      "Server latency(median/75%/95%): " +
+        f"${serverLatency.getMedian * nanosToMills}%.2f/" +
+        f"${serverLatency.get75thPercentile * nanosToMills}%.2f/" +
+        f"${serverLatency.get95thPercentile() * nanosToMills}%.2f"
     )
 
     status.mkString(" ")

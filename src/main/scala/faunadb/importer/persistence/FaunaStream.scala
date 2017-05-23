@@ -52,7 +52,7 @@ final class AkkaFaunaStream[A] private(connPool: ConnectionPool)(implicit contex
   private def executorsWith(queryRunner: QueryRunner) = connPool.clients.map { client =>
     Flow[FSeq[(A, Expr)]].mapAsyncUnordered(context.config.threadsPerEndpoint) { batch =>
       val (elems, exprs) = batch.unzip
-      Stats.Latency.measure {
+      Stats.ImportLatency.measure {
         queryRunner
           .runQuery(client, exprs)
           .map(res => elems.zip(res.map(Result(_))))
