@@ -15,24 +15,7 @@ import scala.collection.JavaConversions._
 import scala.util.Try
 import scopt._
 
-final class CmdArgs(
-  val config: ConfigBuilder = ConfigBuilder(),
-  val context: ContextBuilder = ContextBuilder()
-) {
-  def result(): Option[(Config, Seq[(File, Context)])] = {
-    config.result() flatMap { c =>
-      context.result(c) map ((c, _))
-    } fold (
-      err => {
-        println(err)
-        None
-      },
-      res => Some(res)
-    )
-  }
-}
-
-object CmdArgs {
+private[importer] object CmdArgs {
   private val c = new CmdArgs()
 
   def parse(args: Array[String]): Option[(Config, Seq[(File, Context)])] =
@@ -197,6 +180,23 @@ object CmdArgs {
       if (str.trim.nonEmpty) success
       else failure(s"$name can NOT be blank")
     }
+  }
+}
+
+private final class CmdArgs(
+  val config: ConfigBuilder = ConfigBuilder(),
+  val context: ContextBuilder = ContextBuilder()
+) {
+  def result(): Option[(Config, Seq[(File, Context)])] = {
+    config.result() flatMap { c =>
+      context.result(c) map ((c, _))
+    } fold (
+      err => {
+        println(err)
+        None
+      },
+      res => Some(res)
+    )
   }
 }
 

@@ -10,8 +10,9 @@ class InputParserSpec extends ContextSpec {
 
   val jsonFile = new File("src/test/resources/testdata.json")
   val csvFile = new File("src/test/resources/testdata.csv")
+  val tsvFile = new File("src/test/resources/testdata.tsv")
   val invalidFile = new File("src/test/resources/logback-test.xml")
-  val invalidFileName = new File("src/test/resources/blankfile")
+  val invalidFileName = new File("invalid file name")
 
   "The input parser" should "parse a JSON file" in {
     InputParser(jsonFile).get.records().toStream should contain only (
@@ -51,6 +52,27 @@ class InputParserSpec extends ContextSpec {
     )
   }
 
+  it should "parse a TSV file" in {
+    val tsvContext: Context = context.copy(
+      fieldsInOrder = Vector("name", "age")
+    )
+
+    InputParser(tsvFile)(tsvContext).get.records().toStream should contain only (
+      Ok(
+        Record("1", None, Object(Pos(1, 1),
+          "name" -> Scalar(Pos(1, 1), StringT, "Bob D"),
+          "age" -> Scalar(Pos(1, 7), StringT, "21")
+        ))
+      ),
+      Ok(
+        Record("2", None, Object(Pos(2, 1),
+          "name" -> Scalar(Pos(2, 1), StringT, "Marry"),
+          "age" -> Scalar(Pos(2, 7), StringT, "22")
+        ))
+      )
+    )
+  }
+
   it should "fail with invalid file extension" in {
     InputParser(invalidFile) shouldBe
       Err("Unsupported file type xml for logback-test.xml")
@@ -58,7 +80,7 @@ class InputParserSpec extends ContextSpec {
 
   it should "fail with invalid file name" in {
     InputParser(invalidFileName) shouldBe
-      Err("Unsupported file blankfile")
+      Err("Unsupported file invalid file name")
   }
 
 }

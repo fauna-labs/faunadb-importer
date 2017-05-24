@@ -46,16 +46,16 @@ final class RecordConverter private(idCache: IdCache, context: Context, record: 
     try {
       original match {
         case Scalar(_, _, raw) => expected match {
-          case SelfRef => Ok(StringV(record.id))
-          case StringT => Ok(StringV(raw))
-          case LongT   => Ok(LongV(raw.toLong))
-          case DoubleT => Ok(DoubleV(raw.toDouble))
-          case BoolT   => Ok(BooleanV(raw.toBoolean))
+          case SelfRefT    => Ok(StringV(record.id))
+          case StringT     => Ok(StringV(raw))
+          case LongT       => Ok(LongV(raw.toLong))
+          case DoubleT     => Ok(DoubleV(raw.toDouble))
+          case BoolT       => Ok(BooleanV(raw.toBoolean))
 
           case ts: TimeT => Ok(ts.convert(raw, TimeV(_)).get)
           case dt: DateT => Ok(dt.convert(raw, DateV(_)).get)
 
-          case Ref(clazz) =>
+          case RefT(clazz) =>
             idCache.get(clazz, raw)
               .map(id => Ok(RefV(s"classes/$clazz/$id")))
               .getOrElse(Err(s"Can not find referenced id $raw for class $clazz at ${record.localized}"))

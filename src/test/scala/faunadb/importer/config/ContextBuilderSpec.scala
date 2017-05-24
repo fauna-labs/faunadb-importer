@@ -23,7 +23,7 @@ class ContextBuilderSpec extends SimpleSpec {
     val builder = ContextBuilder()
     builder.file(file)
     builder += Clazz("clazz1")
-    builder += Field("id", SelfRef)
+    builder += Field("id", SelfRefT)
     builder += Field("name", StringT)
     builder += Rename("oldName", "newName")
     builder += Ignore("ignoredField")
@@ -38,7 +38,7 @@ class ContextBuilderSpec extends SimpleSpec {
             clazz = "clazz1",
             idField = Some("id"),
             tsField = Some("tsField"),
-            typesByField = Map("id" -> SelfRef, "name" -> StringT),
+            typesByField = Map("id" -> SelfRefT, "name" -> StringT),
             fieldsInOrder = IndexedSeq("id", "name"),
             fieldNameByLegacyName = Map("oldName" -> "newName"),
             ignoredFields = Set("ignoredField"),
@@ -72,8 +72,8 @@ class ContextBuilderSpec extends SimpleSpec {
   it should "fail when no multiple ref fields" in {
     val builder = ContextBuilder()
     builder.file(file)
-    builder += Field("id", SelfRef)
-    builder += Field("other", SelfRef)
+    builder += Field("id", SelfRefT)
+    builder += Field("other", SelfRefT)
     builder.result(config) shouldBe Err("There can be only one self-ref field per import file")
   }
 

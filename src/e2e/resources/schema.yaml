@@ -1,0 +1,30 @@
+src/e2e/resources/users.json:
+  class: users
+  fields:
+    - name: id
+      type: ref
+
+  ignoredFields:
+    - id
+
+src/e2e/resources/tweets.csv:
+  class: tweets
+  skipRoot: true
+  tsField: created_at
+  fields:
+    - name: id
+      type: ref
+
+    - name: user_id
+      type: ref(users)
+      rename: user
+
+    - name: message
+      type: string
+
+    - name: created_at
+      type: ts(yyyy-MM-dd HH:mm:ss)
+
+  ignoredFields:
+    - id
+    - created_at

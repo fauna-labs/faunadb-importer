@@ -6,8 +6,8 @@ import org.joda.time.format._
 import scala.util.Try
 
 sealed trait Type {val name: String}
-case class Ref(clazz: String) extends Type {val name = s"ref($clazz)"}
-case object SelfRef extends Type {val name = "selfref"}
+case class RefT(clazz: String) extends Type {val name = s"ref($clazz)"}
+case object SelfRefT extends Type {val name = "selfref"}
 case object StringT extends Type {val name = "string"}
 case object LongT extends Type {val name = "long"}
 case object DoubleT extends Type {val name = "double"}
@@ -47,7 +47,7 @@ object Type {
     defRegx.findFirstMatchIn(definition.trim) match {
       case Some(field) =>
         field.group(1) match {
-          case "ref"    => Ok(if (field.group(3) == null) SelfRef else Ref(field.group(3)))
+          case "ref"    => Ok(if (field.group(3) == null) SelfRefT else RefT(field.group(3)))
           case "ts"     => Ok(TimeT(Option(field.group(3))))
           case "date"   => Ok(DateT(Option(field.group(3))))
           case "string" => Ok(StringT)

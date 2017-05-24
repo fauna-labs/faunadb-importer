@@ -32,7 +32,13 @@ private class RecordParser(input: Iterator[Result[Value]], context: Context) {
 
   private def findTS(tsField: String, value: Result[(String, Value)]): Result[Record] =
     value flatMap { case (id, v) =>
-      getScalarField(tsField, v) map (ts => Record(id, Some(ts), v))
+      getScalarField(tsField, v) map { ts =>
+        val tpe = context
+          .typesByField
+          .getOrElse(tsField, TimeT(None))
+
+        Record(id, Some(Scalar(ts.pos, tpe, ts.raw)), v)
+      }
     }
 
   private def noTSField(value: Result[(String, Value)]): Result[Record] =

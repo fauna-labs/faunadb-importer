@@ -10,7 +10,7 @@ final case class Ok[A](get: A) extends Result[A] {
 }
 
 final case class Err[A](error: String) extends Result[A] {
-  def get: A = throw new NoSuchElementException("Err.get")
+  def get: A = throw new NoSuchElementException(s"Err($error).get")
   def isSuccess: Boolean = false
 }
 

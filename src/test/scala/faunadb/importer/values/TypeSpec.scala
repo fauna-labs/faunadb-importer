@@ -6,8 +6,8 @@ import faunadb.specs._
 class TypeSpec extends SimpleSpec {
 
   "Types" should "be able to be found by their definition" in {
-    Type.byDefinition("ref") shouldBe Ok(SelfRef)
-    Type.byDefinition("ref(users)") shouldBe Ok(Ref("users"))
+    Type.byDefinition("ref") shouldBe Ok(SelfRefT)
+    Type.byDefinition("ref(users)") shouldBe Ok(RefT("users"))
     Type.byDefinition("string") shouldBe Ok(StringT)
     Type.byDefinition("long") shouldBe Ok(LongT)
     Type.byDefinition("double") shouldBe Ok(DoubleT)
