@@ -131,6 +131,7 @@ private[importer] object CmdArgs {
         .foreach(c.context += Clazz(_)),
 
       opt[Boolean]("skip-root")
+        .abbr("k")
         .text(
           "Configures the parser to ignore the first line for TSV/CSV " +
             "files or to ignore first array element in JSON files"

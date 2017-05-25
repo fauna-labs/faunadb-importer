@@ -66,7 +66,7 @@ private class InlineReporter extends StatsReporter {
 
   def start() {
     task = Some {
-      Scheduler.schedule(3.seconds) {
+      Scheduler.schedule(1.seconds) {
         Log.status(report())
       }
     }
