@@ -11,15 +11,18 @@ object Log {
   @volatile private var statusLine: String = ""
   @volatile private var lastSize: Int = 0
 
-  def info(msg: String) {
+  def info(msg: String): Unit = syncInfo(_.info(msg))
+  def warn(msg: String): Unit = syncInfo(_.warn(s"[WARN] $msg"))
+
+  private def syncInfo(f: Logger => Unit): Unit = {
     if (lastSize > 0) {
       synchronized {
         print(fillLine())
-        info.info(msg)
+        f(info)
         print(statusLine)
       }
     } else {
-      info.info(msg)
+      f(info)
     }
   }
 
@@ -33,7 +36,7 @@ object Log {
 
   def clearStatus(): Unit = status("")
 
-  private def fillLine(line: String = "") =
+  private def fillLine(line: String = ""): String =
     s"\r\r$line${" " * Math.max(0, lastSize - line.length)}\r"
 
   def error(msg: String): Unit = error.error(msg)

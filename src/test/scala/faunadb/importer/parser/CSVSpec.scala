@@ -1,18 +1,19 @@
 package faunadb.importer.parser
 
-import faunadb.importer.config.Context
+import faunadb.importer.config._
 import faunadb.importer.lang._
 import faunadb.importer.values._
-import faunadb.specs._
 
-class CSVSpec extends ContextSpec with IOReaderUtils {
+class CSVSpec extends ParserSpec {
+
+  val parser = CSV
 
   implicit val csvContext: Context = context.copy(
     fieldsInOrder = Vector("name", "age")
   )
 
   "The csv parser" should "parse comma separate strings" in {
-    CSV.parse(
+    parse(
       """bob,42
         |joe,25""".stripMargin
     ) should contain only (
@@ -32,7 +33,7 @@ class CSVSpec extends ContextSpec with IOReaderUtils {
       skipRootElement = true
     )
 
-    CSV.parse(
+    parse(
       """aa,bb
         |bob,42""".stripMargin
     )(useHeaderLine) should contain only Ok(
@@ -44,11 +45,11 @@ class CSVSpec extends ContextSpec with IOReaderUtils {
   }
 
   it should "parse empty file" in {
-    CSV.parse("") shouldBe empty
+    parse("") shouldBe empty
   }
 
   it should "parser empty values as null" in {
-    CSV.parse(",") should contain only Ok(
+    parse(",") should contain only Ok(
       Object(Pos(1, 1),
         "name" -> Null(Pos(1, 1)),
         "age" -> Null(Pos(1, 2))
@@ -57,7 +58,7 @@ class CSVSpec extends ContextSpec with IOReaderUtils {
   }
 
   it should "parser null values as null" in {
-    CSV.parse("null ,NULL") should contain only Ok(
+    parse("null ,NULL") should contain only Ok(
       Object(Pos(1, 1),
         "name" -> Null(Pos(1, 1)),
         "age" -> Null(Pos(1, 7))
@@ -66,7 +67,7 @@ class CSVSpec extends ContextSpec with IOReaderUtils {
   }
 
   it should "fail when entry has more columns than specified" in {
-    CSV.parse("bob,42,male") should contain only
+    parse("bob,42,male") should contain only
       Err("Line has more columns than specified at line: 1, column: 8")
   }
 }

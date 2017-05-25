@@ -7,8 +7,8 @@ import faunadb.specs._
 
 class RecordParserSpec extends ContextSpec {
 
-  def parse(values: Value*)(implicit context: Context): Stream[PR[Record]] =
-    RecordParser.parse(Stream(values.map(Ok(_)): _*))
+  def parse(values: Value*)(implicit context: Context): Stream[Result[Record]] =
+    RecordParser.parse(values.map(Ok(_)).iterator).toStream
 
   "The record parser" should "parse a stream of values" in {
     val data = Object(pos,

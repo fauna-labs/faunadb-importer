@@ -46,13 +46,14 @@ final class RecordConverter private(idCache: IdCache, context: Context, record: 
     try {
       original match {
         case Scalar(_, _, raw) => expected match {
-          case SelfRef     => Ok(StringV(record.id))
-          case StringT     => Ok(StringV(raw))
-          case LongT       => Ok(LongV(raw.toLong))
-          case DoubleT     => Ok(DoubleV(raw.toDouble))
-          case BoolT       => Ok(BooleanV(raw.toBoolean))
-          case ts: TimeT   => Ok(TimeV(ts.format(raw)))
-          case date: DateT => Ok(DateV(date.format(raw)))
+          case SelfRef => Ok(StringV(record.id))
+          case StringT => Ok(StringV(raw))
+          case LongT   => Ok(LongV(raw.toLong))
+          case DoubleT => Ok(DoubleV(raw.toDouble))
+          case BoolT   => Ok(BooleanV(raw.toBoolean))
+
+          case ts: TimeT => Ok(ts.convert(raw, TimeV(_)).get)
+          case dt: DateT => Ok(dt.convert(raw, DateV(_)).get)
 
           case Ref(clazz) =>
             idCache.get(clazz, raw)

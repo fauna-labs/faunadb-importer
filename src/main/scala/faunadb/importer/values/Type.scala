@@ -3,6 +3,7 @@ package faunadb.importer.values
 import faunadb.importer.lang._
 import org.joda.time._
 import org.joda.time.format._
+import scala.util.Try
 
 sealed trait Type {val name: String}
 case class Ref(clazz: String) extends Type {val name = s"ref($clazz)"}
@@ -13,26 +14,30 @@ case object DoubleT extends Type {val name = "double"}
 case object BoolT extends Type {val name = "boolean"}
 
 sealed trait DateTimeT[A] extends Type {
-  protected val format: Option[String]
-  protected val defaultFormatter: DateTimeFormatter
-  protected lazy val formatter: DateTimeFormatter =
+  val format: Option[String]
+  val defaultFormatter: DateTimeFormatter
+
+  private lazy val formatter: DateTimeFormatter =
     format
       .map(DateTimeFormat.forPattern)
       .getOrElse(defaultFormatter)
 
-  def format(raw: String): A
+  protected def convertUsing(formatter: DateTimeFormatter, raw: String): A
+  def convert[B](raw: String, f: A => B): Try[B] = Try(f(convertUsing(formatter, raw)))
 }
 
 case class TimeT(format: Option[String]) extends DateTimeT[Instant] {
   val name = "timestamp"
   val defaultFormatter: DateTimeFormatter = ISODateTimeFormat.dateTimeParser()
-  def format(raw: String): Instant = formatter.parseDateTime(raw).toInstant
+  protected def convertUsing(formatter: DateTimeFormatter, raw: String): Instant =
+    formatter.parseDateTime(raw).toInstant
 }
 
 case class DateT(format: Option[String]) extends DateTimeT[LocalDate] {
   val name = "date"
   val defaultFormatter: DateTimeFormatter = ISODateTimeFormat.yearMonthDay()
-  def format(raw: String): LocalDate = formatter.parseDateTime(raw).toLocalDate
+  protected def convertUsing(formatter: DateTimeFormatter, raw: String): LocalDate =
+    formatter.parseDateTime(raw).toLocalDate
 }
 
 object Type {
