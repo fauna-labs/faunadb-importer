@@ -18,7 +18,7 @@ object Main {
       })
 
       Log.info("Starting import...")
-      StatsReporter.start()
+      StatsReporter.start(config.reportType)
 
       try {
         Import.run(config, filesToImport)

@@ -2,6 +2,7 @@ package faunadb.importer.config
 
 import faunadb.importer.errors._
 import faunadb.importer.lang._
+import faunadb.importer.report._
 
 case class Config(
   // Fauna secret used to authenticate requests
@@ -18,7 +19,10 @@ case class Config(
   threadsPerEndpoint: Int = 4,
 
   // Error handling strategy to be used
-  errorStrategy: ErrorStrategy = ErrorStrategy.StopOnError
+  errorStrategy: ErrorStrategy = ErrorStrategy.StopOnError,
+
+  // Progress report strategy to be used
+  reportType: ReportType = ReportType.Inline
 )
 
 final class ConfigBuilder {
@@ -65,6 +69,10 @@ object ConfigBuilder {
 
     final case class OnError(value: ErrorStrategy) extends BuildStep {
       def configure(c: Config): Config = c.copy(errorStrategy = value)
+    }
+
+    final case class Report(value: ReportType) extends BuildStep {
+      def configure(c: Config): Config = c.copy(reportType = value)
     }
   }
 }

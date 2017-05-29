@@ -18,6 +18,7 @@ class CmdArgsSpec extends SimpleSpec {
         "--skip-root", "true",
         "--ignore-fields", "a,b,c",
         "--ts-field", "tsField",
+        "--report-type",  "silent",
         "src/test/resources/testdata.json"
       )
     ) shouldNot be(None)

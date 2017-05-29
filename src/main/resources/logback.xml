@@ -42,6 +42,10 @@
         <appender-ref ref="ERRORS"/>
     </logger>
 
+    <logger name="status" level="INFO" additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
     <root level="off">
         <appender-ref ref="STDOUT"/>
     </root>
