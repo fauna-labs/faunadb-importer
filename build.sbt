@@ -1,7 +1,7 @@
 // TODO: create and package a ./bin/import script with sensible java options
 
 lazy val testAll = TaskKey[Unit]("test-all")
-lazy val E2ETest = config("e2e") extend(Test)
+lazy val E2ETest = config("e2e") extend Test
 
 lazy val root = (project in file("."))
   .configs(E2ETest)
