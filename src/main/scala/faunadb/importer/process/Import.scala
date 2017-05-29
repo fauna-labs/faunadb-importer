@@ -2,7 +2,6 @@ package faunadb.importer.process
 
 import faunadb.importer.config._
 import faunadb.importer.errors._
-import faunadb.importer.lang._
 import faunadb.importer.parser._
 import faunadb.importer.persistence._
 import faunadb.importer.process.phases._
@@ -13,13 +12,13 @@ import scala.concurrent._
 import scala.concurrent.duration._
 
 object Import {
-  type Input = Seq[(File, Context)]
+  val IdCacheFile = new File("cache/ids")
 
-  def run(config: Config, filesToImport: Input) {
+  def run(config: Config, filesToImport: Seq[(File, Context)]) {
     val pool = ConnectionPool(config.endpoints, config.secret)
 
     try {
-      new Import(pool).run(filesToImport)
+      for (step <- steps(pool, filesToImport)) step.run()
       Log.info("Import completed successfully")
     } catch {
       case e: ErrorHandler.Stop =>
@@ -35,31 +34,76 @@ object Import {
       pool.close()
     }
   }
+
+  private def steps(connPool: ConnectionPool, filesToImport: Seq[(File, Context)]): Seq[Step] = {
+    val steps = Seq.newBuilder[Step]
+    steps += new IncBytesToRead(filesToImport)
+
+    val idCache = State.load[IdCache](IdCacheFile) match {
+      case Some(cachedIds) =>
+        Log.info("Using pre-generated ids...")
+        cachedIds
+
+      case None =>
+        val newCache = IdCache()
+        steps += new IncBytesToRead(filesToImport)
+        steps += new GenerateIds(connPool, newCache, filesToImport)
+        steps += new SavePregeneratedIds(newCache)
+        newCache
+    }
+
+    steps += new InsertRecords(connPool, idCache, filesToImport)
+    steps.result()
+  }
 }
 
-private class Import(connPool: ConnectionPool) {
-  def run(filesToImport: Import.Input) {
-    val idCache = IdCache() // TODO: save and load ids cache
-    filesToImport.foreach { case (file, _) => Stats.BytesToRead.inc(file.length() * 2) /* Two phases*/}
-    forAll(filesToImport) { implicit c => GenerateIds(AkkaFaunaStream(connPool), idCache) }
-    forAll(filesToImport) { implicit c => InsertRecords(AkkaFaunaStream(connPool), idCache) }
-  }
+private sealed trait Step {
+  def run(): Unit
+}
 
-  def forAll(files: Import.Input)(fn: Context => Phase[Record]) {
-    files.foreach { case (file, context) =>
-      val phase = fn(context)
-      Log.info(s"${phase.description} for $file")
+private sealed abstract class RunPhase(filesToLoad: Seq[(File, Context)]) extends Step {
 
-      InputParser(file)(context) fold (
-        error => throw new IllegalArgumentException(error),
-        parser => try runPhase(phase, parser.records())(context) finally parser.close()
+  def phase()(implicit c: Context): Phase[Record]
+
+  def run(): Unit = for ((file, context) <- filesToLoad) {
+    implicit val _ = context
+
+    val currentPhase = phase()
+    Log.info(s"${currentPhase.description} for $file")
+
+    InputParser(file) fold (
+      error => throw new IllegalStateException(error),
+      parser => Await.result(
+        currentPhase.run(
+          parser
+            .records()
+            .flatMap(ErrorHandler.handle(_))
+        ),
+        Duration.Inf
       )
-    }
-  }
-
-  private def runPhase(phase: Phase[Record], records: Iterator[Result[Record]])(implicit c: Context) =
-    Await.result(
-      phase.run(records.flatMap(ErrorHandler.handle(_))),
-      Duration.Inf
     )
+  }
+}
+
+private final class IncBytesToRead(filesToLoad: Seq[(File, Context)]) extends Step {
+  def run(): Unit =
+    for ((file, _) <- filesToLoad)
+      Stats.BytesToRead.inc(file.length())
+}
+
+private final class SavePregeneratedIds(idCache: IdCache) extends Step {
+  def run(): Unit =
+    State.store(Import.IdCacheFile, idCache)
+}
+
+private final class GenerateIds(connPool: ConnectionPool, idCache: IdCache, filesToLoad: Seq[(File, Context)])
+  extends RunPhase(filesToLoad) {
+  def phase()(implicit c: Context): Phase[Record] =
+    GenerateIds(AkkaFaunaStream(connPool), idCache)
+}
+
+private final class InsertRecords(connPool: ConnectionPool, idCache: IdCache, filesToLoad: Seq[(File, Context)])
+  extends RunPhase(filesToLoad) {
+  def phase()(implicit c: Context): Phase[Record] =
+    InsertRecords(AkkaFaunaStream(connPool), idCache)
 }
