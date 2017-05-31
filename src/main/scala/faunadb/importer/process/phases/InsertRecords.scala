@@ -1,51 +1,44 @@
 package faunadb.importer.process.phases
 
-import akka._
-import akka.stream.scaladsl._
 import faunadb.importer.config._
 import faunadb.importer.lang.{ Result, _ }
 import faunadb.importer.persistence._
 import faunadb.importer.values._
 import faunadb.query._
-import faunadb.values.{ Value, _ }
+import faunadb.values.{ Value => FValue, _ }
 
 private[process] object InsertRecords {
-  def apply(fauna: FaunaStream[Record], idCache: IdCache)(implicit context: Context): InsertRecords =
-    new InsertRecords(fauna, idCache)
+  def apply(idCache: IdCache, connPool: ConnectionPool)(implicit c: Context): InsertRecords =
+    new InsertRecords(idCache, connPool)
 }
 
-private[process] final class InsertRecords(fauna: FaunaStream[Record], idCache: IdCache)
-  (implicit val context: Context) extends Phase[Record] {
+private[process] final class InsertRecords(idCache: IdCache, connPool: ConnectionPool)(implicit c: Context)
+  extends Phase("Inserting records", connPool)
+    with DiscardValues {
 
-  val description = "Inserting records"
+  private val toFauna: (Record) => Result[FValue] = RecordConverter(idCache)
 
-  protected val runFlow: Flow[(Record, Expr), (Record, Result[Value]), NotUsed] =
-    fauna.runWith(QueryRunner.DiscardValues)
-
-  protected val toFauna: (Record) => Result[Value] =
-    RecordConverter(idCache)
-
-  protected def buildExpr(record: Record): Result[Expr] =
+  protected def buildQuery(record: Record): Result[Expr] = {
     for {
       ref <- refFor(record)
       ts <- tsFor(record)
       data <- toFauna(record)
     } yield
       Insert(ref, ts, Action.Create, Obj("data" -> data))
+  }
 
-  // TODO: Keep track of inserted rows so we can retry the failures later
-  protected def handledResult(record: Record, value: Value): Result[Unit] = Ok(())
-
-  private def refFor(record: Record): Result[RefV] =
-    idCache.get(context.clazz, record.id) map { newId =>
+  private def refFor(record: Record): Result[RefV] = {
+    idCache.get(c.clazz, record.id) map { newId =>
       Ok(RefV(
-        s"classes/${context.clazz}/$newId"
+        s"classes/${c.clazz}/$newId"
       ))
-    } getOrElse
+    } getOrElse {
       Err(s"Could not find pre-generated id ${record.id} " +
         s"for record at ${record.localized}")
+    }
+  }
 
-  private def tsFor(record: Record): Result[Expr] =
+  private def tsFor(record: Record): Result[Expr] = {
     record.ts match {
       case Some(Scalar(_, t @ TimeT(_), raw)) =>
         val res = t.convert(raw, ts => Ok(TimeV(ts): Expr)) recover {
@@ -56,4 +49,5 @@ private[process] final class InsertRecords(fauna: FaunaStream[Record], idCache: 
       case None        => Ok(Time("now"))
       case Some(other) => Err(s"Invalid value at timestamp field at ${other.localized}")
     }
+  }
 }

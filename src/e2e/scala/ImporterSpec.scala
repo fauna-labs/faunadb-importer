@@ -12,8 +12,6 @@ class ImporterSpec
     with ConcurrentUtils
     with BeforeAndAfterAll {
 
-  import ExecutionContext.Implicits._
-
   var secret: String = _
   val dbName = "import-test"
   val adminClient = FaunaClient("secret", "http://localhost:8443")

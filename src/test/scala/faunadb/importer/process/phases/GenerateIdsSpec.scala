@@ -1,42 +1,74 @@
 package faunadb.importer.process.phases
 
-import akka._
-import akka.stream.scaladsl._
 import faunadb.importer.errors._
-import faunadb.importer.lang._
 import faunadb.importer.persistence._
-import faunadb.importer.values._
-import faunadb.query.Expr
 import faunadb.specs._
-import faunadb.values.{ StringV, Value => FValue }
+import faunadb.values._
 
-class GenerateIdsSpec extends ContextSpec with ConcurrentUtils {
+class GenerateIdsSpec
+  extends ContextSpec
+    with ConcurrentUtils
+    with Mocks {
 
-  val fauna = new FaunaStream[Record] {
-    var count = 0
-    def runWith(queryRunner: QueryRunner): Flow[(Record, Expr), (Record, Result[FValue]), NotUsed] =
-      Flow.fromFunction { case (record, _) =>
-        count += 1
-        record -> Ok(StringV(s"$count"))
-      }
-  }
+  val idCache = IdCache()
 
-  "The generate ids phase" should "generate ids for all records" in {
-    val idCache = IdCache()
+  "The generate ids phase" should "generate ids for all records" in new MockedFauna {
+    batchedQueryReturns(
+      StringV(record1.id),
+      StringV(record2.id),
+      StringV(record3.id)
+    )
 
     await(
-      GenerateIds(fauna, idCache)
-        .run(Iterator(record1, record2, record3))
+      GenerateIds(idCache, connPool).run(
+        Iterator(
+          record1,
+          record2,
+          record3
+        )
+      )
     )
 
     idCache shouldEqual allRecordsIds
   }
 
-  it should "fail on duplicated id" in {
+  it should "fail on duplicated id" in new MockedFauna {
+    batchedQueryReturns(
+      StringV(record1.id),
+      StringV(record1.id)
+    )
+
     the[ErrorHandler.Stop] thrownBy await(
-      GenerateIds(fauna, IdCache())
-        .run(Iterator(record1, record1))
+      GenerateIds(idCache, connPool).run(
+        Iterator(
+          record1,
+          record1
+        )
+      )
     ) should have message "Duplicated id 1 found for record at line: 0, column: 0: null"
   }
 
+  it should "fail if fauna does not return a string id" in new MockedFauna {
+    batchedQueryReturns(NullV)
+
+    the[ErrorHandler.Stop] thrownBy await(
+      GenerateIds(idCache, connPool).run(
+        Iterator(
+          record1
+        )
+      )
+    ) should have message "Fauna did NOT returned a string ID. Value returned: NullV"
+  }
+
+  it should "fail if fauna returns a unconvertable string" in new MockedFauna {
+    batchedQueryReturns(StringV("Can't be Long"))
+
+    the[ErrorHandler.Stop] thrownBy await(
+      GenerateIds(idCache, connPool).run(
+        Iterator(
+          record1
+        )
+      )
+    ) should have message "Can NOT convert id returned from fauna to Long. For input string: \"Can't be Long\""
+  }
 }
