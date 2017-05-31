@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml._
 import faunadb.importer.config._
 import faunadb.importer.errors._
 import faunadb.importer.lang._
+import faunadb.importer.report._
 import faunadb.importer.values._
 import java.io.File
 import java.net.URL
@@ -73,6 +74,17 @@ private[importer] object CmdArgs {
       .foreach {
         case "stop"     => c.config += OnError(ErrorStrategy.StopOnError)
         case "continue" => c.config += OnError(ErrorStrategy.DoNotStop)
+      }
+
+    opt[String]("report-type")
+      .text("Progress report strategy to use")
+      .valueName(s"<inline|detailed|silent>")
+      .abbr("t")
+      .validate(either("Report type", "inline", "detailed", "silent"))
+      .foreach {
+        case "inline"   => c.config += Report(ReportType.Inline)
+        case "detailed" => c.config += Report(ReportType.Detailed)
+        case "silent"   => c.config += Report(ReportType.Silent)
       }
 
     help("help").text("Display this text")
@@ -173,7 +185,10 @@ private[importer] object CmdArgs {
 
     private def either(name: String, options: String*)(value: String): Either[String, Unit] = {
       if (options.contains(value)) success
-      else failure(s"$name should be either: ${options.mkString(", ")}")
+      else failure(
+        s"$name should be either: ${options.take(options.length - 1).mkString(", ")}, " +
+          s"or ${options.last}"
+      )
     }
 
     private def notBlank(name: String)(str: String): Either[String, Unit] = {

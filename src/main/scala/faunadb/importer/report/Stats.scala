@@ -2,11 +2,12 @@ package faunadb.importer.report
 
 import com.codahale.metrics._
 import faunadb.importer.concurrent._
-import java.text.DecimalFormat
+import java.util.concurrent._
+import org.slf4j._
 import scala.concurrent.duration._
 
 object Stats {
-  private val reg = new MetricRegistry()
+  private[report] val reg = new MetricRegistry()
 
   val BytesToRead: Counter = reg.counter("bytes-to-read")
   val BytesRead: Counter = reg.counter("bytes-read")
@@ -15,70 +16,103 @@ object Stats {
   val ServerLatency: Timer = reg.timer("server-latency")
 }
 
+sealed trait ReportType
+object ReportType {
+  final case object Inline extends ReportType
+  final case object Detailed extends ReportType
+  final case object Silent extends ReportType
+}
+
 object StatsReporter {
-  private val byteUnits = Array("B", "KB", "MB", "GB", "TB")
-  private val bytesFormat = new DecimalFormat("#,##0.0")
+  import ReportType._
+
+  private var reporter: Option[StatsReporter] = None
+
+  def start(reportType: ReportType) {
+    stop()
+    reporter = {
+      val r = reportType match {
+        case Detailed => new DetailedReporter(Stats.reg)
+        case Inline   => new InlineReporter()
+        case Silent   => new SilentReporter()
+      }
+      r.start()
+      Some(r)
+    }
+  }
+
+  def stop() {
+    reporter = reporter flatMap { r =>
+      r.stop()
+      None
+    }
+  }
+}
+
+private sealed trait StatsReporter {
+  def start()
+  def stop()
+}
+
+private final class SilentReporter extends StatsReporter {
+  def start() {}
+  def stop() {}
+}
+
+private class InlineReporter extends StatsReporter {
+
+  private var task: Option[Scheduler.Task] = _
   private val nanosToMills = 1.0 / MILLISECONDS.toNanos(1)
 
-  private var reporter: Option[Scheduler.Task] = None
-
   def start() {
-    stop()
-    reporter = Some {
+    task = Some {
       Scheduler.schedule(3.seconds) {
         Log.status(report())
       }
     }
   }
 
-  private def report(): String = {
-    val bytesToRead = Stats.BytesToRead.getCount
-    val bytesRead = Stats.BytesRead.getCount
-    val errors = Stats.ErrorsFound.getCount
-    val requests = Stats.ImportLatency
-    val importLatency = Stats.ImportLatency.getSnapshot
-    val serverLatency = Stats.ServerLatency.getSnapshot
-
-    val status = Seq(
-      s"Errors: $errors",
-
-      "Bytes(read/total): " +
-        s"${prettyBytes(bytesRead)}/" +
-        s"${prettyBytes(bytesToRead)}",
-
-      "RPS(mean/1min/5min/15min): " +
-        f"${requests.getMeanRate}%.2f/" +
-        f"${requests.getOneMinuteRate}%.2f/" +
-        f"${requests.getFiveMinuteRate}%.2f/" +
-        f"${requests.getFifteenMinuteRate}%.2f",
-
-      "Import latency(median/75%/95%): " +
-        f"${importLatency.getMedian * nanosToMills}%.2f/" +
-        f"${importLatency.get75thPercentile * nanosToMills}%.2f/" +
-        f"${importLatency.get95thPercentile() * nanosToMills}%.2f",
-
-      "Server latency(median/75%/95%): " +
-        f"${serverLatency.getMedian * nanosToMills}%.2f/" +
-        f"${serverLatency.get75thPercentile * nanosToMills}%.2f/" +
-        f"${serverLatency.get95thPercentile() * nanosToMills}%.2f"
-    )
-
-    status.mkString(" ")
-  }
-
-  private def prettyBytes(size: Long): String = {
-    if (size > 0) {
-      val unit = (Math.log10(size) / Math.log10(1024)).toInt
-      bytesFormat.format(size / Math.pow(1024, unit)) + byteUnits(unit)
-    } else "0"
-  }
-
   def stop() {
-    reporter foreach { task =>
-      task.cancel()
+    task = task flatMap { t =>
+      t.cancel()
       Log.clearStatus()
       Log.info(report())
-      reporter = None
+      None
+    }
+  }
+
+  private def report(): String =
+    Seq(
+      f"Progress: ${Stats.BytesRead.getCount / Math.max(1.0, Stats.BytesToRead.getCount) * 100}%.2f%%",
+      s"Errors: ${Stats.ErrorsFound.getCount}",
+      f"RPS: ${Stats.ImportLatency.getMeanRate}%.2f",
+      f"Latency(client/server): " +
+        f"${Stats.ImportLatency.getSnapshot.getMedian * nanosToMills}%.2f/" +
+        f"${Stats.ServerLatency.getSnapshot.getMedian * nanosToMills}%.2f"
+    ) mkString " "
+}
+
+private final class DetailedReporter(reg: MetricRegistry) extends StatsReporter {
+
+  private val logger = LoggerFactory.getLogger("status")
+  private var reporter: Option[ScheduledReporter] = _
+
+  def start(): Unit = {
+    reporter = {
+      val r = Slf4jReporter.forRegistry(reg)
+        .convertRatesTo(TimeUnit.MILLISECONDS)
+        .outputTo(logger)
+        .build()
+
+      r.start(20, TimeUnit.SECONDS)
+      Some(r)
+    }
+  }
+
+  def stop(): Unit = {
+    reporter = reporter flatMap { r =>
+      r.stop()
+      None
     }
   }
 }
