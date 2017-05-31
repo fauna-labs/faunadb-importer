@@ -27,7 +27,6 @@ case class Config(
 
 final class ConfigBuilder {
   import ConfigBuilder._
-
   private val steps = IndexedSeq.newBuilder[BuildStep]
 
   def +=(step: BuildStep): ConfigBuilder = {
@@ -36,7 +35,7 @@ final class ConfigBuilder {
   }
 
   def result(): Result[Config] = {
-    steps.result().foldLeft(Config(""))((c, s) => s.configure(c)) match {
+    steps.result().foldLeft(Config(""))((c, fn) => fn(c)) match {
       case c if c.secret.isEmpty => Err("No key's secret specified")
       case c                     => Ok(c)
     }
@@ -44,35 +43,17 @@ final class ConfigBuilder {
 }
 
 object ConfigBuilder {
-  def apply(): ConfigBuilder = new ConfigBuilder()
+  type BuildStep = (Config => Config)
 
-  sealed trait BuildStep {
-    def configure(c: Config): Config
-  }
+  def apply(): ConfigBuilder =
+    new ConfigBuilder()
 
   final object Dsl {
-    final case class Secret(value: String) extends BuildStep {
-      def configure(c: Config): Config = c.copy(secret = value)
-    }
-
-    final case class Endpoints(value: Seq[String]) extends BuildStep {
-      def configure(c: Config): Config = c.copy(endpoints = value)
-    }
-
-    final case class BatchSize(value: Int) extends BuildStep {
-      def configure(c: Config): Config = c.copy(batchSize = value)
-    }
-
-    final case class ThreadsPerEndpoint(value: Int) extends BuildStep {
-      def configure(c: Config): Config = c.copy(threadsPerEndpoint = value)
-    }
-
-    final case class OnError(value: ErrorStrategy) extends BuildStep {
-      def configure(c: Config): Config = c.copy(errorStrategy = value)
-    }
-
-    final case class Report(value: ReportType) extends BuildStep {
-      def configure(c: Config): Config = c.copy(reportType = value)
-    }
+    def Secret(value: String): BuildStep = _.copy(secret = value)
+    def Endpoints(value: Seq[String]): BuildStep = _.copy(endpoints = value)
+    def BatchSize(value: Int): BuildStep = _.copy(batchSize = value)
+    def ThreadsPerEndpoint(value: Int): BuildStep = _.copy(threadsPerEndpoint = value)
+    def OnError(value: ErrorStrategy): BuildStep = _.copy(errorStrategy = value)
+    def Report(value: ReportType): BuildStep = _.copy(reportType = value)
   }
 }

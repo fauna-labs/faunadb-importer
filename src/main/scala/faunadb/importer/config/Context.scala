@@ -57,18 +57,14 @@ final class ContextBuilder {
 
     stepsByFile.flatMapS { case (file, steps) =>
       steps
-        .foldLeftS(Context(config, ""))((c, s) => s.configure(c))
+        .foldLeftS(Context(config, ""))((c, fn) => fn(c))
         .flatMap { context =>
-          if (context.clazz.nonEmpty)
-            Ok(file -> context)
-          else
-            Err("\"class\" was NOT specified for import file " + file.getName)
+          if (context.clazz.nonEmpty) Ok(file -> context)
+          else Err("\"class\" was NOT specified for import file " + file.getName)
         }
     } flatMap { filesToImport =>
-      if (filesToImport.isEmpty)
-        Err("No file to import could be found")
-      else
-        Ok(filesToImport.toSeq)
+      if (filesToImport.isEmpty) Err("No file to import could be found")
+      else Ok(filesToImport.toSeq)
     }
   }
 
@@ -82,54 +78,38 @@ final class ContextBuilder {
 
 
 object ContextBuilder {
-  def apply(): ContextBuilder = new ContextBuilder()
+  type BuildStep = (Context => Result[Context])
 
-  sealed trait BuildStep {
-    def configure(c: Context): Result[Context]
-  }
+  def apply(): ContextBuilder =
+    new ContextBuilder()
 
   final object Dsl {
-    final case class SkipRoot(value: Boolean) extends BuildStep {
-      def configure(c: Context): Result[Context] = Ok(c.copy(skipRootElement = value))
-    }
+    def SkipRoot(value: Boolean): BuildStep = c => Ok(c.copy(skipRootElement = value))
+    def Clazz(value: String): BuildStep = c => Ok(c.copy(clazz = value))
+    def Ignore(value: String): BuildStep = c => Ok(c.copy(ignoredFields = c.ignoredFields + value))
+    def TSField(value: String): BuildStep = c => Ok(c.copy(tsField = Option(value)))
 
-    final case class Clazz(value: String) extends BuildStep {
-      def configure(c: Context): Result[Context] = Ok(c.copy(clazz = value))
-    }
-
-    final case class Field(name: String, tpe: Type) extends BuildStep {
-      def configure(c: Context): Result[Context] = {
-        configureRefField(c) map (_.copy(
-          fieldsInOrder = c.fieldsInOrder :+ name,
-          typesByField = c.typesByField + (name -> tpe)
-        ))
-      }
-
-      private def configureRefField(c: Context): Result[Context] = tpe match {
+    def Field(name: String, tpe: Type): BuildStep = { c =>
+      val res = tpe match {
         case SelfRefT if c.idField.isDefined => Err("There can be only one self-ref field per import file")
         case SelfRefT                        => Ok(c.copy(idField = Some(name)))
         case _                               => Ok(c)
       }
+
+      res map (_.copy(
+        fieldsInOrder = c.fieldsInOrder :+ name,
+        typesByField = c.typesByField + (name -> tpe)
+      ))
     }
 
-    final case class Ignore(value: String) extends BuildStep {
-      def configure(c: Context): Result[Context] =
-        Ok(c.copy(ignoredFields = c.ignoredFields + value))
-    }
-
-    final case class Rename(oldName: String, newName: String) extends BuildStep {
-      def configure(c: Context): Result[Context] =
-        if (oldName != newName)
-          Ok(c.copy(
-            fieldNameByLegacyName =
-              c.fieldNameByLegacyName + (oldName -> newName)
-          ))
-        else
-          Ok(c)
-    }
-
-    final case class TSField(value: String) extends BuildStep {
-      override def configure(c: Context): Result[Context] = Ok(c.copy(tsField = Option(value)))
+    def Rename(oldName: String, newName: String): BuildStep = { c =>
+      if (oldName != newName)
+        Ok(c.copy(
+          fieldNameByLegacyName =
+            c.fieldNameByLegacyName + (oldName -> newName)
+        ))
+      else
+        Ok(c)
     }
   }
 }
