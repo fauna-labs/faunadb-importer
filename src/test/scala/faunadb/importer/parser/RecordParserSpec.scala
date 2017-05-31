@@ -32,7 +32,7 @@ class RecordParserSpec extends ContextSpec {
 
   it should "use ts field when specified" in {
     val withId = context.copy(tsField = Some("ts"))
-    val data = Object(pos, "ts" -> Scalar(pos, TimeT(None), "123"))
+    val data = Object(pos, "ts" -> Scalar(pos, StringT, "123"))
 
     parse(data)(withId) should contain only Ok(
       Record("1", Some(Scalar(pos, TimeT(None), "123")), data)

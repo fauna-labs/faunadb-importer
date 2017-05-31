@@ -20,8 +20,8 @@ class RecordConverterSpec extends ContextSpec with DataFixtures {
     toFauna(Record("0", None, Scalar(pos, LongT, "10"))) shouldBe Ok(LongV(10))
     toFauna(Record("0", None, Scalar(pos, DoubleT, "10.2"))) shouldBe Ok(DoubleV(10.2))
     toFauna(Record("0", None, Scalar(pos, BoolT, "true"))) shouldBe Ok(BooleanV(true))
-    toFauna(Record("0", None, Scalar(pos, SelfRef, "1"))) shouldBe Ok(StringV("0"))
-    toFauna(Record("0", None, Scalar(pos, Ref(aClass), "2"))) shouldBe Ok(RefV(s"classes/$aClass/${record2.id}"))
+    toFauna(Record("0", None, Scalar(pos, SelfRefT, "1"))) shouldBe Ok(StringV("0"))
+    toFauna(Record("0", None, Scalar(pos, RefT(aClass), "2"))) shouldBe Ok(RefV(s"classes/$aClass/${record2.id}"))
     toFauna(Record("0", None, Scalar(pos, TimeT(None), "2017-02-01T00:00:00Z"))) shouldBe Ok(TimeV("2017-02-01T00:00:00Z"))
     toFauna(Record("0", None, Scalar(pos, TimeT(Some("yyyy")), "2017"))) shouldBe Ok(TimeV("2017"))
     toFauna(Record("0", None, Scalar(pos, DateT(Some("yyyy")), "2017"))) shouldBe Ok(DateV("2017"))
@@ -73,7 +73,7 @@ class RecordConverterSpec extends ContextSpec with DataFixtures {
   }
 
   it should "on missing foreign key" in {
-    toFauna(Record("0", None, Scalar(pos, Ref("non-existing"), "1"))) shouldBe
+    toFauna(Record("0", None, Scalar(pos, RefT("non-existing"), "1"))) shouldBe
       Err("Can not find referenced id 1 for class non-existing at line: 0, column: 0: 1")
   }
 }

@@ -16,6 +16,7 @@ object InputParser {
     case FileType(ext) => ext.toLowerCase() match {
       case "json" => Ok(JSON)
       case "csv"  => Ok(CSV)
+      case "tsv"  => Ok(TSV)
       case other  => Err(s"Unsupported file type $other for ${file.getName}")
     }
 

@@ -106,9 +106,9 @@ object ContextBuilder {
       }
 
       private def configureRefField(c: Context): Result[Context] = tpe match {
-        case SelfRef if c.idField.isDefined => Err("There can be only one self-ref field per import file")
-        case SelfRef                        => Ok(c.copy(idField = Some(name)))
-        case _                              => Ok(c)
+        case SelfRefT if c.idField.isDefined => Err("There can be only one self-ref field per import file")
+        case SelfRefT                        => Ok(c.copy(idField = Some(name)))
+        case _                               => Ok(c)
       }
     }
 
