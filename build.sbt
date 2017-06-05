@@ -7,7 +7,7 @@ lazy val root = (project in file("."))
   .settings(
     name := "faunadb-importer",
     version := "1.0-SNAPSHOT",
-    scalaVersion := "2.11.8",
+    scalaVersion := "2.12.2",
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings"),
     javaOptions ++= Seq("-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:G1HeapRegionSize=4m", "-server"),
     fork := true,
@@ -15,14 +15,14 @@ lazy val root = (project in file("."))
     // TODO: Check licences
     libraryDependencies ++= Seq(
       // Main
-      "com.faunadb" %% "faunadb-scala" % "1.1.0",
+      "com.faunadb" %% "faunadb-scala" % "1.2.0",
       "io.monix" %% "monix" % "2.3.0",
       "com.github.scopt" %% "scopt" % "3.5.0",
       "ch.qos.logback" % "logback-classic" % "1.2.3",
-      "com.fasterxml.jackson.core" % "jackson-core" % "2.8.6",
-      "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.4",
-      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-csv" % "2.6.4",
-      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.6.4",
+      "com.fasterxml.jackson.core" % "jackson-core" % "2.8.8",
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.8",
+      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-csv" % "2.8.8",
+      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.8.8",
 
       // Test
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",

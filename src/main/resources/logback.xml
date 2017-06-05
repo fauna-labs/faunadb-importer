@@ -30,7 +30,7 @@
         </encoder>
     </appender>
 
-    <logger name="info" level="INFO">
+    <logger name="info" level="INFO" additivity="false">
         <appender-ref ref="INFO"/>
     </logger>
 
