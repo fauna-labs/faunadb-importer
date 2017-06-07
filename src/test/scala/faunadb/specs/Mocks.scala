@@ -14,8 +14,8 @@ trait Mocks {
 
     val connPool: ConnectionPool = {
       val pool = stub[ConnectionPool]
-      (pool.pickClient _).when().returns(faunaClient)
-      (pool.size _).when().returns(1)
+      (pool.borrowClient _).when().returns(faunaClient)
+      (pool.maxConcurrentReferences _).when().returns(1)
       pool
     }
 

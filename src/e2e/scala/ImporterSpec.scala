@@ -1,10 +1,10 @@
 import faunadb._
 import faunadb.importer._
+import faunadb.importer.process._
 import faunadb.query._
 import faunadb.specs._
 import faunadb.values._
 import org.scalatest._
-import scala.concurrent._
 
 class ImporterSpec
   extends FlatSpec
@@ -54,6 +54,8 @@ class ImporterSpec
     )
 
   "The import tool" should "import a schema" in {
+    Import.IdCacheFile.delete()
+
     Main.main(Array(
       "import-schema",
       "--secret", secret,

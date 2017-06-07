@@ -52,14 +52,14 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   private def runQueries(source: Observable[QPair]): Observable[RPair] = {
     source
       .bufferTumbling(c.config.batchSize)
-      .mapAsync(c.config.threadsPerEndpoint * connPool.size)(pickClientAndRun)
+      .mapAsync(connPool.maxConcurrentReferences)(pickClientAndRun)
       .onErrorRecoverWith(handleWrongCredentials)
       .mergeMap(Observable.fromIterable(_))
   }
 
-  private def pickClientAndRun(batch: Seq[QPair]): Task[RBatch] = {
-    val client = connPool.pickClient
-    runBatch(client, batch) doOnFinish (_ => Task.now(connPool.release(client)))
+  private def pickClientAndRun(batch: QBatch): Task[RBatch] = {
+    val client = connPool.borrowClient()
+    runBatch(client, batch) doOnFinish (_ => Task.now(connPool.returnClient(client)))
   }
 
   private def runBatch(client: FaunaClient, batch: QBatch): Task[RBatch] = {
@@ -77,7 +77,7 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   private def splitBatchAndRetry(client: FaunaClient, batch: QBatch): Future[RBatch] = {
     Observable
       .fromIterable(batch)
-      .mapAsync(c.config.threadsPerEndpoint)(pair => Task.fromFuture(retryQPair(client, pair)))
+      .mapAsync(1)(pair => Task.fromFuture(retryQPair(client, pair)))
       .toListL.runAsync
   }
 

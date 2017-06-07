@@ -6,21 +6,22 @@ import faunadb._
 import faunadb.importer.report._
 import java.util.concurrent.TimeUnit._
 import java.util.concurrent.atomic._
+import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 
 trait ConnectionPool {
-  def pickClient: FaunaClient
-  def release(client: FaunaClient): Unit
+  def borrowClient(): FaunaClient
+  def returnClient(client: FaunaClient): Unit
+  def maxConcurrentReferences: Int
   def close(): Unit
-  def size: Int
 }
 
 object ConnectionPool {
-  def apply(endpoints: Seq[String], secret: String): ConnectionPool =
-    new FaunaClientPool(endpoints, secret)
+  def apply(endpoints: Seq[String], secret: String, maxRefCountPerEndpoint: Int): ConnectionPool =
+    new FaunaClientPool(endpoints, secret, maxRefCountPerEndpoint)
 }
 
-private final class FaunaClientPool(endpoints: Seq[String], secret: String)
+private final class FaunaClientPool(endpoints: Seq[String], secret: String, maxRefCountPerEndpoint: Int)
   extends ConnectionPool {
 
   private val refCountByClient: Map[FaunaClient, AtomicInteger] = {
@@ -31,59 +32,69 @@ private final class FaunaClientPool(endpoints: Seq[String], secret: String)
     clients.map(_ -> new AtomicInteger(0)).toMap
   }
 
-  val size: Int = refCountByClient.size
-
-  private val clientsByIndex = refCountByClient.toIndexedSeq
-  @volatile private var searchIndex = -1
-
-  def pickClient: FaunaClient = {
-    var pickedClient: FaunaClient = null
-    var pickedRefCount: AtomicInteger = null
-    var minRefCountFound = Int.MaxValue
-
-    // Start from a different position everytime so we don't
-    // prefer the first few clients in the pool
-    searchIndex = cycleInc(searchIndex)
-    var index = searchIndex
-    var walked = 0
-
-    while (walked < size) {
-      val (client, refCount) = clientsByIndex(index)
-      val currentCount = refCount.get()
-
-      // Prefere the client with less references to it
-      if (currentCount < minRefCountFound) {
-        minRefCountFound = currentCount
-        pickedRefCount = refCount
-        pickedClient = client
-      }
-
-      index = cycleInc(index)
-      walked += 1
-    }
-
-    pickedRefCount.incrementAndGet()
-    pickedClient
-  }
-
-  def release(client: FaunaClient): Unit = {
-    refCountByClient.get(client) foreach (_.decrementAndGet())
-  }
-
-  def close(): Unit = {
-    refCountByClient.keys foreach (_.close())
-  }
-
-  private def cycleInc(n: Int): Int = {
-    if (n + 1 >= size) 0 else n + 1
-  }
-
   private def newClient(endpoint: Option[String]): FaunaClient = {
     FaunaClient(
       secret = secret,
       endpoint = endpoint.orNull,
       httpClient = new HttpWrapper()
     )
+  }
+
+  private val clientsByIndex = refCountByClient.toIndexedSeq
+  private val poolSize = refCountByClient.size
+
+  val maxConcurrentReferences: Int = maxRefCountPerEndpoint * poolSize
+
+  @volatile
+  private var searchIndex = -1
+
+  @tailrec
+  def borrowClient(): FaunaClient = {
+    var pickedClient: FaunaClient = null
+    var pickedRefCount: AtomicInteger = null
+    var minRefCountFound = Int.MaxValue
+
+    // Start from a different position everytime so we don't
+    // prefer the first few clients in the pool
+    searchIndex = Math.max((searchIndex + 1) % poolSize, 0)
+    val startIndex = searchIndex
+    var walked = 0
+
+    while (walked < poolSize) {
+      val (client, refCount) = clientsByIndex(Math.max((startIndex + walked) % poolSize, 0))
+      val currentCount = refCount.get()
+
+      // Prefer the client with less references to it
+      if (currentCount < minRefCountFound && currentCount < maxRefCountPerEndpoint) {
+        minRefCountFound = currentCount
+        pickedRefCount = refCount
+        pickedClient = client
+      }
+
+      walked += 1
+    }
+
+    if (pickedClient == null) {
+      throw new IllegalStateException(
+        "Maximum number of concurrent references was reached." +
+          "Callers to bottowClient must respect the value of maxConcurrentReferences"
+      )
+    }
+
+    if (!pickedRefCount.compareAndSet(minRefCountFound, minRefCountFound + 1)) {
+      // Another thread got the client first. Retry!
+      borrowClient()
+    } else {
+      pickedClient
+    }
+  }
+
+  def returnClient(client: FaunaClient): Unit = {
+    refCountByClient.get(client) foreach (_.decrementAndGet())
+  }
+
+  def close(): Unit = {
+    refCountByClient.keys foreach (_.close())
   }
 }
 
