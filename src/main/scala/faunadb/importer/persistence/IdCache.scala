@@ -6,7 +6,7 @@ object IdCache {
   def apply(): IdCache = new IdCache()
 }
 
-final class IdCache private() {
+final class IdCache private() extends Serializable {
   // Do NOT support concurrent read/writes
   private val ids = mutable.Map[String, Long]()
 
