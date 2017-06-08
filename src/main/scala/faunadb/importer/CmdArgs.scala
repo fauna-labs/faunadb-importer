@@ -12,7 +12,7 @@ import faunadb.importer.values._
 import java.io.File
 import java.net.URL
 import java.util
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.Try
 import scopt._
 
@@ -94,7 +94,7 @@ private[importer] object CmdArgs {
         .text("File to import. Supported formats: JSON, CSV, and TSV")
         .required()
         .validate(fileExists)
-        .foreach(c.context.file(_)),
+        .foreach(c.context.file),
 
       opt[Seq[String]]("format")
         .text(
@@ -243,9 +243,9 @@ private object SchemaFile {
           context += Clazz(schema.clazz)
           context += SkipRoot(schema.skipRoot)
           context += TSField(schema.tsField)
-          schema.ignoredFields.foreach(context += Ignore(_))
+          schema.ignoredFields.asScala.foreach(context += Ignore(_))
 
-          schema.fields.toSeq.flatMapS { fieldDef =>
+          schema.fields.asScala.flatMapS { fieldDef =>
             Type.byDefinition(fieldDef.tpe) map { tpe =>
               if (fieldDef.rename != null) context += Rename(fieldDef.name, fieldDef.rename)
               context += Field(fieldDef.name, tpe)
@@ -261,7 +261,7 @@ private object SchemaFile {
   private def readSchemaDefinition(file: File): Try[Seq[(String, SchemaFile)]] = Try {
     new ObjectMapper(new YAMLFactory())
       .readValue[ResultMap](file, new TypeReference[ResultMap] {})
-      .toSeq
+      .asScala.toSeq
   }
 
   private def toFile(name: String): Result[File] = {

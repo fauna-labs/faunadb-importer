@@ -12,7 +12,7 @@ class CmdArgsSpec extends SimpleSpec {
         "--secret", "abc",
         "--endpoints", "http://localhost:8443, http://localhost:8444",
         "--batch-size", "2",
-        "--threads-per-endpoint", "5",
+        "--max-requests-per-endpoint", "5",
         "--error-strategy", "continue",
         "--format", "id:ref, name:string, age:long, oldName->newName:string",
         "--skip-root", "true",

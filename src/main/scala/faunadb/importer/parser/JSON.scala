@@ -43,8 +43,8 @@ private final class JSON(parser: JsonParser, context: Context) {
   }
 
   private def readValue(): Result[Value] = parser.currentToken() match {
-    case START_OBJECT => collectUntil(END_OBJECT)(readObjectEntry, toObject)
-    case START_ARRAY  => collectUntil(END_ARRAY)(readValue, toSequence)
+    case START_OBJECT => collectUntil(END_OBJECT)(readObjectEntry(), toObject)
+    case START_ARRAY  => collectUntil(END_ARRAY)(readValue(), toSequence)
     case VALUE_NULL   => Ok(Null(currentPos))
 
     case VALUE_STRING             => Ok(Scalar(currentPos, StringT, parser.getText))
@@ -55,7 +55,7 @@ private final class JSON(parser: JsonParser, context: Context) {
     case token => Err(s"Unexpected token $token at ${currentPos.localized}")
   }
 
-  private def collectUntil[Coll, Elem, To](stop: JsonToken)(read: () => Result[Elem], build: (Pos, Coll) => To)
+  private def collectUntil[Coll, Elem, To](stop: JsonToken)(read: => Result[Elem], build: (Pos, Coll) => To)
     (implicit cbf: CanBuildFrom[_, Elem, Coll]): Result[To] = {
 
     val pos = currentPos
@@ -64,7 +64,7 @@ private final class JSON(parser: JsonParser, context: Context) {
 
     while (parser.nextValue() != stop) {
       if (last.isSuccess) {
-        last = read() map (res += _)
+        last = read map (res += _)
       }
     }
 

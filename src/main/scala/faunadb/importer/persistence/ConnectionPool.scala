@@ -7,7 +7,7 @@ import faunadb.importer.report._
 import java.util.concurrent.TimeUnit._
 import java.util.concurrent.atomic._
 import scala.annotation.tailrec
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 trait ConnectionPool {
   def borrowClient(): FaunaClient
@@ -121,10 +121,7 @@ private final class LatencyMeasureHandler[T](delegate: AsyncHandler[T])
   extends AsyncHandler[T] {
 
   def onHeadersReceived(headers: HttpResponseHeaders): STATE = {
-    headers.getHeaders.get("X-Query-Time") foreach { time =>
-      Stats.ServerLatency.update(time.toLong, MILLISECONDS)
-    }
-
+    headers.getHeaders.get("X-Query-Time").asScala foreach (time => Stats.ServerLatency.update(time.toLong, MILLISECONDS))
     delegate.onHeadersReceived(headers)
   }
 
