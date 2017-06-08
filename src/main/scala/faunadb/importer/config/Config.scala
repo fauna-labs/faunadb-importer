@@ -15,8 +15,8 @@ case class Config(
   // Number of queries to be executed at a single batch
   batchSize: Int = 50,
 
-  // Number of threads used to run queries per endpoint
-  threadsPerEndpoint: Int = 4,
+  // Maximum number of concurrent requests per endpoint
+  maxRequestsPerEndpoint: Int = 4,
 
   // Error handling strategy to be used
   errorStrategy: ErrorStrategy = ErrorStrategy.StopOnError,
@@ -52,8 +52,8 @@ object ConfigBuilder {
     def Secret(value: String): BuildStep = _.copy(secret = value)
     def Endpoints(value: Seq[String]): BuildStep = _.copy(endpoints = value)
     def BatchSize(value: Int): BuildStep = _.copy(batchSize = value)
-    def ThreadsPerEndpoint(value: Int): BuildStep = _.copy(threadsPerEndpoint = value)
     def OnError(value: ErrorStrategy): BuildStep = _.copy(errorStrategy = value)
     def Report(value: ReportType): BuildStep = _.copy(reportType = value)
+    def MaxRequestsPerEndpoint(value: Int): BuildStep = _.copy(maxRequestsPerEndpoint = value)
   }
 }

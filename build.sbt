@@ -15,8 +15,7 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       // Main
       "com.faunadb" %% "faunadb-scala" % "1.1.0",
-      "com.typesafe.akka" %% "akka-actor" % "2.5.0",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.0",
+      "io.monix" %% "monix" % "2.3.0",
       "com.github.scopt" %% "scopt" % "3.5.0",
       "ch.qos.logback" % "logback-classic" % "1.2.3",
       "com.fasterxml.jackson.core" % "jackson-core" % "2.8.6",
@@ -25,7 +24,8 @@ lazy val root = (project in file("."))
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.6.4",
 
       // Test
-      "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "org.scalamock" %% "scalamock-scalatest-support" % "3.5.0" % "test"
     ),
 
     inConfig(E2ETest)(Defaults.testSettings) ++ Seq(

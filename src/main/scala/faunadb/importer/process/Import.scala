@@ -6,7 +6,6 @@ import faunadb.importer.parser._
 import faunadb.importer.persistence._
 import faunadb.importer.process.phases._
 import faunadb.importer.report._
-import faunadb.importer.values._
 import java.io._
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -15,7 +14,7 @@ object Import {
   val IdCacheFile = new File("cache/ids")
 
   def run(config: Config, filesToImport: Seq[(File, Context)]) {
-    val pool = ConnectionPool(config.endpoints, config.secret)
+    val pool = ConnectionPool(config.endpoints, config.secret, config.maxRequestsPerEndpoint)
 
     try {
       for (step <- steps(pool, filesToImport)) step.run()
@@ -63,7 +62,7 @@ private sealed trait Step {
 
 private sealed abstract class RunPhase(filesToLoad: Seq[(File, Context)]) extends Step {
 
-  def phase()(implicit c: Context): Phase[Record]
+  def phase()(implicit c: Context): Phase
 
   def run(): Unit = for ((file, context) <- filesToLoad) {
     implicit val _ = context
@@ -98,12 +97,12 @@ private final class SavePregeneratedIds(idCache: IdCache) extends Step {
 
 private final class GenerateIds(connPool: ConnectionPool, idCache: IdCache, filesToLoad: Seq[(File, Context)])
   extends RunPhase(filesToLoad) {
-  def phase()(implicit c: Context): Phase[Record] =
-    GenerateIds(AkkaFaunaStream(connPool), idCache)
+  def phase()(implicit c: Context): Phase =
+    GenerateIds(idCache, connPool)
 }
 
 private final class InsertRecords(connPool: ConnectionPool, idCache: IdCache, filesToLoad: Seq[(File, Context)])
   extends RunPhase(filesToLoad) {
-  def phase()(implicit c: Context): Phase[Record] =
-    InsertRecords(AkkaFaunaStream(connPool), idCache)
+  def phase()(implicit c: Context): Phase =
+    InsertRecords(idCache, connPool)
 }

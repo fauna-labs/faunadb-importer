@@ -15,7 +15,7 @@ class ContextBuilderSpec extends SimpleSpec {
     secret = "abc",
     endpoints = Seq("url1", "url2"),
     batchSize = 2,
-    threadsPerEndpoint = 3,
+    maxRequestsPerEndpoint = 3,
     errorStrategy = ErrorStrategy.DoNotStop
   )
 

@@ -1,6 +1,5 @@
 package faunadb.importer
 
-import faunadb.importer.concurrent._
 import faunadb.importer.lang._
 import faunadb.importer.process._
 import faunadb.importer.report._
@@ -32,7 +31,6 @@ object Main {
     Log.info("Shutting down the import...")
     Log.info(s"Execution time: ${TimeFormat.prettyDuration(startTime, System.currentTimeMillis())}")
     StatsReporter.stop()
-    Concurrent.shutdown()
     Log.stop()
   }
 }

@@ -1,18 +1,16 @@
 import faunadb._
 import faunadb.importer._
+import faunadb.importer.process._
 import faunadb.query._
 import faunadb.specs._
 import faunadb.values._
 import org.scalatest._
-import scala.concurrent._
 
 class ImporterSpec
   extends FlatSpec
     with Matchers
     with ConcurrentUtils
     with BeforeAndAfterAll {
-
-  import ExecutionContext.Implicits._
 
   var secret: String = _
   val dbName = "import-test"
@@ -56,6 +54,8 @@ class ImporterSpec
     )
 
   "The import tool" should "import a schema" in {
+    Import.IdCacheFile.delete()
+
     Main.main(Array(
       "import-schema",
       "--secret", secret,

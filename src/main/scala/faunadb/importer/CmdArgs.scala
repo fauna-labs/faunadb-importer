@@ -60,11 +60,11 @@ private[importer] object CmdArgs {
       .validate(biggerThanZero("Batch size"))
       .foreach(c.config += BatchSize(_))
 
-    opt[Int]("threads-per-endpoint")
-      .text("The number of threads to use per FaunaDB endpoint")
-      .abbr("t")
+    opt[Int]("max-requests-per-endpoint")
+      .text("The maximum number of concurrent requests per endpoint")
+      .abbr("m")
       .validate(biggerThanZero("Threads per endpoint"))
-      .foreach(c.config += ThreadsPerEndpoint(_))
+      .foreach(c.config += MaxRequestsPerEndpoint(_))
 
     opt[String]("error-strategy")
       .text("The error strategy to be used")

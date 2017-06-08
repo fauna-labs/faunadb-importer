@@ -1,7 +1,5 @@
 package faunadb.importer.process.phases
 
-import akka._
-import akka.stream.scaladsl._
 import faunadb.importer.config._
 import faunadb.importer.lang._
 import faunadb.importer.persistence._
@@ -10,30 +8,26 @@ import faunadb.query.{ Expr, NextId }
 import faunadb.values.{ Value => FValue }
 
 private[process] object GenerateIds {
-  def apply(fauna: FaunaStream[Record], idCache: IdCache)(implicit c: Context): GenerateIds =
-    new GenerateIds(fauna, idCache)
+  def apply(idCache: IdCache, connPool: ConnectionPool)(implicit c: Context): GenerateIds =
+    new GenerateIds(idCache, connPool)
 }
 
-private[process] final class GenerateIds(fauna: FaunaStream[Record], idCache: IdCache)
-  (implicit val context: Context) extends Phase[Record] {
+private[process] final class GenerateIds(idCache: IdCache, connPool: ConnectionPool)(implicit c: Context)
+  extends Phase("Pre-generating ids", connPool)
+    with PreserveValues {
 
-  val description = "Pre-generating ids"
+  protected def buildQuery(record: Record): Result[Expr] = Ok(NextId())
 
-  protected val runFlow: Flow[(Record, Expr), (Record, Result[FValue]), NotUsed] =
-    fauna.runWith(QueryRunner.PreserveValues)
-
-  protected def buildExpr(record: Record): Result[Expr] =
-    Ok(NextId())
-
-  protected def handledResult(record: Record, value: FValue): Result[Unit] =
+  protected def handleResponse(record: Record, value: FValue): Result[Unit] = {
     faunaIdAsString(value) flatMap { newId =>
-      idCache.put(context.clazz, record.id, newId) map { _ =>
+      idCache.put(c.clazz, record.id, newId) map { _ =>
         Err(
           s"Duplicated id ${record.id} found for record at " +
             s"${record.localized}"
         )
       } getOrElse Ok(())
     }
+  }
 
   private def faunaIdAsString(id: FValue): Result[Long] =
     id.to[String]
