@@ -31,8 +31,8 @@ lazy val root = (project in file("."))
 
     // E2E Testing
     inConfig(E2ETest)(Defaults.testSettings) ++ Seq(
-      scalaSource := baseDirectory.value / "src/e2e/scala",
-      resourceDirectory in Test := baseDirectory.value / "src/e2e/resources/"
+      scalaSource in E2ETest := baseDirectory.value / "src/e2e/scala",
+      resourceDirectory in E2ETest := baseDirectory.value / "src/e2e/resources/"
     ),
 
     testAll := (test in E2ETest).dependsOn(test in Test).value,

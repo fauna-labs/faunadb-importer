@@ -13,6 +13,7 @@ import java.io.File
 import java.net.URL
 import java.util
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.util.Try
 import scopt._
 
@@ -56,15 +57,55 @@ private[importer] object CmdArgs {
 
     opt[Int]("batch-size")
       .text("Number of queries to be grouped at a single batch")
-      .abbr("b")
+      .abbr("bs")
       .validate(biggerThanZero("Batch size"))
       .foreach(c.config += BatchSize(_))
 
     opt[Int]("max-requests-per-endpoint")
       .text("The maximum number of concurrent requests per endpoint")
-      .abbr("m")
-      .validate(biggerThanZero("Threads per endpoint"))
+      .abbr("me")
+      .validate(biggerThanZero("Max requests per endpoint"))
       .foreach(c.config += MaxRequestsPerEndpoint(_))
+
+    opt[Int]("max-network-errors")
+      .text(
+        "The maximum number of network erros tolerated " +
+          "within the configured period of time")
+      .abbr("ne")
+      .validate(biggerThanZero("Max network errors"))
+      .foreach(c.config += MaxNetworkErrors(_))
+
+    opt[Int]("reset-network-errors-period")
+      .text(
+        "The number of seconds in which the network errors " +
+          "count will be reset if no new errors were found")
+      .abbr("re")
+      .validate(biggerThanZero("Reset network errors period"))
+      .foreach(n => c.config += NetworkErrorsResetTime(n.seconds))
+
+    opt[Int]("network-errors-backoff-time")
+      .text(
+        "The number of seconds to delay new requests when " +
+          "the network is unstable")
+      .abbr("bt")
+      .validate(biggerThanZero("Network errors backoff time"))
+      .foreach(n => c.config += NetworkErrorsBackoffTime(n.seconds))
+
+    opt[Int]("max-network-errors-backoff-time")
+      .text(
+        "The maximum number of seconds to delay new requests " +
+          "when applying explonential backoff")
+      .abbr("mb")
+      .validate(biggerThanZero("Max network errors backoff time"))
+      .foreach(n => c.config += MaxNetworkErrorsBackoffTime(n.seconds))
+
+    opt[Int]("network-errors-backoff-factor")
+      .text(
+        "The factor used when exponentially backing off requests due " +
+          "to network instability")
+      .abbr("bf")
+      .validate(biggerThanZero("Network errors backoff factor"))
+      .foreach(c.config += NetworkErrorsBackoffFactor(_))
 
     opt[String]("error-strategy")
       .text("The error strategy to be used")

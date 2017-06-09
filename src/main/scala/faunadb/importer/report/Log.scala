@@ -27,10 +27,12 @@ object Log {
   }
 
   def status(line: String) {
-    synchronized {
-      print(fillLine(line))
-      lastSize = line.length
-      statusLine = line
+    if (info.isInfoEnabled()) {
+      synchronized {
+        print(fillLine(line))
+        lastSize = line.length
+        statusLine = line
+      }
     }
   }
 

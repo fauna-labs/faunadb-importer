@@ -3,6 +3,7 @@ package faunadb.importer.config
 import faunadb.importer.errors._
 import faunadb.importer.lang._
 import faunadb.importer.report._
+import scala.concurrent.duration._
 
 case class Config(
   // Fauna secret used to authenticate requests
@@ -18,6 +19,21 @@ case class Config(
   // Maximum number of concurrent requests per endpoint
   maxRequestsPerEndpoint: Int = 4,
 
+  // Maximum number of network errors tolerated
+  maxNetworkErrors: Int = 50,
+
+  // The timeframe to reset the network errors counter
+  networkErrorsResetTime: FiniteDuration = 2.minutes,
+
+  // The time delay applied when backing off network requests
+  networkErrorsBackoffTime: FiniteDuration = 1.seconds,
+
+  // The maximum time delay applied when exponentially backing off network requests
+  maxNetworkErrorsBackoffTime: FiniteDuration = 1.minutes,
+
+  // The factor used when exponentially backing of network requests
+  networkErrorsBackoffFactor: Int = 2,
+
   // Error handling strategy to be used
   errorStrategy: ErrorStrategy = ErrorStrategy.StopOnError,
 
@@ -27,6 +43,7 @@ case class Config(
 
 final class ConfigBuilder {
   import ConfigBuilder._
+
   private val steps = IndexedSeq.newBuilder[BuildStep]
 
   def +=(step: BuildStep): ConfigBuilder = {
@@ -55,5 +72,10 @@ object ConfigBuilder {
     def OnError(value: ErrorStrategy): BuildStep = _.copy(errorStrategy = value)
     def Report(value: ReportType): BuildStep = _.copy(reportType = value)
     def MaxRequestsPerEndpoint(value: Int): BuildStep = _.copy(maxRequestsPerEndpoint = value)
+    def MaxNetworkErrors(value: Int): BuildStep = _.copy(maxNetworkErrors = value)
+    def NetworkErrorsResetTime(value: FiniteDuration): BuildStep = _.copy(networkErrorsResetTime = value)
+    def NetworkErrorsBackoffTime(value: FiniteDuration): BuildStep = _.copy(networkErrorsBackoffTime = value)
+    def MaxNetworkErrorsBackoffTime(value: FiniteDuration): BuildStep = _.copy(maxNetworkErrorsBackoffTime = value)
+    def NetworkErrorsBackoffFactor(value: Int): BuildStep = _.copy(networkErrorsBackoffFactor = value)
   }
 }

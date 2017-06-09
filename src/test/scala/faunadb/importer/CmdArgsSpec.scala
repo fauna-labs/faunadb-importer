@@ -19,6 +19,11 @@ class CmdArgsSpec extends SimpleSpec {
         "--ignore-fields", "a,b,c",
         "--ts-field", "tsField",
         "--report-type",  "silent",
+        "--max-network-errors", "10",
+        "--reset-network-errors-period", "30",
+        "--network-errors-backoff-time", "1",
+        "--max-network-errors-backoff-time", "30",
+        "--network-errors-backoff-factor", "2",
         "src/test/resources/testdata.json"
       )
     ) shouldNot be(None)
