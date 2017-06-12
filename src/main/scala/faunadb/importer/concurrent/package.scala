@@ -7,7 +7,7 @@ package object concurrent {
 
   implicit val scheduler: MScheduler = MScheduler.global
 
-  object Scheduler {
+  final object Scheduler {
     final class Task private[Scheduler](task: Cancelable) {
       def cancel(): Unit = task.cancel()
     }

@@ -11,9 +11,12 @@ import faunadb.importer.report._
 import faunadb.importer.values._
 import faunadb.query.{ Arr, Expr, Let }
 import faunadb.values.{ NullV, Value => FValue }
+import java.io._
 import monix.eval._
+import monix.execution.atomic._
 import monix.reactive._
 import scala.concurrent._
+import scala.concurrent.duration._
 
 private[process] abstract class Phase(val description: String, connPool: ConnectionPool)(implicit c: Context) {
   this: QueryRunner =>
@@ -22,6 +25,14 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   private type RPair = (Record, Result[FValue])
   private type QBatch = Seq[QPair]
   private type RBatch = Seq[RPair]
+
+  private val backoff = new Backoff(
+    maxErrors = c.config.maxNetworkErrors,
+    resetTime = c.config.networkErrorsResetTime,
+    backoffTime = c.config.networkErrorsBackoffTime,
+    backoffFactor = c.config.networkErrorsBackoffFactor,
+    maxBackoffTime = c.config.maxNetworkErrorsBackoffTime
+  )
 
   protected def buildQuery(record: Record): Result[Expr]
 
@@ -65,50 +76,149 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   private def runBatch(client: FaunaClient, batch: QBatch): Task[RBatch] = {
     val (records, exprs) = batch.unzip
 
-    Task.fromFuture {
-      Stats.ImportLatency.measure {
-        runQuery(client, exprs)
-          .map(res => records zip res.map(Result(_)))
-          .recoverWith(handleQueryErrorsWith(_ => splitBatchAndRetry(client, batch)))
+    backoff(Stats.ImportLatency.measure(runQuery(client, exprs)))
+      .map(res => records zip res.map(Result(_)))
+      .onErrorRecoverWith {
+        handleQueryErrorsWith { _ =>
+          splitBatchAndRetry(client, batch)
+        }
       }
-    }
   }
 
-  private def splitBatchAndRetry(client: FaunaClient, batch: QBatch): Future[RBatch] = {
+  private def splitBatchAndRetry(client: FaunaClient, batch: QBatch): Task[RBatch] = {
     Observable
       .fromIterable(batch)
-      .mapAsync(1)(pair => Task.fromFuture(retryQPair(client, pair)))
-      .toListL.runAsync
+      .mapAsync(1)(pair => retryQPair(client, pair))
+      .toListL
   }
 
-  private def retryQPair(client: FaunaClient, pair: QPair): Future[RPair] = {
+  private def retryQPair(client: FaunaClient, pair: QPair): Task[RPair] = {
     val (record, expr) = pair
 
-    client
-      .query(expr)
-      .map(Result(_))
-      .recover(handleQueryErrorsWith(e =>
-        Err(s"${e.getMessage} at ${record.localized}")
-      ))
-      .map(record -> _)
+    backoff(Stats.ImportLatency.measure(client.query(expr)))
+      .map(record -> Result(_))
+      .onErrorRecover {
+        handleQueryErrorsWith { e =>
+          record -> Err(s"${e.getMessage} at ${record.localized}")
+        }
+      }
   }
 
   private def handleQueryErrorsWith[B](handle: (Throwable) => B): PartialFunction[Throwable, B] = {
     case e @ (_: BadRequestException |
-              _: NotFoundException |
-              _: TimeoutException) =>
+              _: NotFoundException) =>
       handle(e)
 
-    case e: UnknownException if e.getMessage.startsWith("request too large") =>
+    case e: UnknownException
+      if e.getMessage.startsWith("request too large") ||
+        e.getMessage.startsWith("Unparsable service 413response") =>
       Log.warn("Request too large. Consider reducing the configured batch-size.")
       handle(e)
   }
 
-  private def handleWrongCredentials: PartialFunction[Throwable, Observable[Nothing]] = {
+  private val handleWrongCredentials: PartialFunction[Throwable, Observable[Nothing]] = {
     case e @ (_: UnauthorizedException |
               _: PermissionDeniedException) =>
       Log.info("Invalid key. You must provide a valid SERVER key.")
       Observable.raiseError(e)
+  }
+}
+
+private final class Backoff(
+  maxErrors: Int,
+  resetTime: FiniteDuration,
+  backoffTime: FiniteDuration,
+  backoffFactor: Int,
+  maxBackoffTime: FiniteDuration
+) {
+
+  private case class State(
+    totalErrors: Int,
+    lastErrorTs: Long,
+    backoffDelay: FiniteDuration) {
+
+    def hasErrors: Boolean = totalErrors > 0
+    def isOverMax: Boolean = totalErrors > maxErrors
+    def isUnstable: Boolean = totalErrors > maxErrors / 2
+    def isExpired: Boolean = lastErrorTs < scheduler.currentTimeMillis() - resetTime.toMillis
+
+    def inc(): State = {
+      State(
+        totalErrors + 1,
+        scheduler.currentTimeMillis(),
+        incBackoffDelay()
+      )
+    }
+
+    private def incBackoffDelay(): FiniteDuration = {
+      if (hasErrors) {
+        maxBackoffTime.min(backoffDelay * backoffFactor)
+      } else {
+        backoffTime
+      }
+    }
+  }
+
+  private final val ZeroState = State(0, 0, Duration.Zero)
+  private final val state = Atomic(ZeroState)
+
+  def apply[A](thunk: => Future[A]): Task[A] = {
+    val s = state.get
+
+    val task = if (s.isUnstable) {
+      Task
+        .deferFuture(thunk)
+        .delayExecution(s.backoffDelay)
+    } else {
+      // Forces async boundary to gain more parallelism
+      Task.deferFuture(thunk)
+    }
+
+    task
+      .onErrorRecoverWith(handleNetworkErrors(thunk))
+      .doOnFinish(resetErrorCount)
+  }
+
+  private def handleNetworkErrors[A](f: => Future[A]): PartialFunction[Throwable, Task[A]] = {
+    case e @ (_: TimeoutException |
+              _: UnavailableException) =>
+      delayRetry(f, e)
+
+    case e: IOException
+      if e.getMessage == "Remotely closed" =>
+      delayRetry(f, e)
+  }
+
+  private def delayRetry[A](f: => Future[A], error: Throwable): Task[A] = {
+    val s = state.transformAndGet(_.inc())
+
+    if (s.isOverMax) {
+      Task.raiseError(
+        new IllegalStateException(
+          s"$maxErrors network issues found in $resetTime.",
+          error
+        )
+      )
+    } else {
+      // Forces async boundary to avoid stack overflow
+      Task.suspend(
+        Task
+          .deferFuture(f)
+          .delayExecution(s.backoffDelay)
+          .onErrorHandleWith(handleNetworkErrors(f))
+          .doOnFinish(resetErrorCount)
+      )
+    }
+  }
+
+  private def resetErrorCount(res: Option[Throwable]): Task[Unit] = {
+    val s = state.get
+
+    if (res.isEmpty && s.hasErrors && s.isExpired) {
+      state.compareAndSet(s, ZeroState)
+    }
+
+    Task.unit
   }
 }
 
