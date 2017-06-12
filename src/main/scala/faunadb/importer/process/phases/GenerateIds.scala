@@ -20,7 +20,7 @@ private[process] final class GenerateIds(cacheWrite: IdCache.Write, connPool: Co
   protected def buildQuery(record: Record): Result[Expr] = NextIdQuery
 
   protected def handleResponse(record: Record, value: FValue): Result[Unit] = {
-    faunaIdAsString(value) flatMap { newId =>
+    faunaIdAsLong(value) flatMap { newId =>
       cacheWrite
         .put(c.clazz, record.id, newId)
         .map(_ => Err(s"Duplicated ID ${record.id} found for recored at: ${record.localized}"))
@@ -28,7 +28,7 @@ private[process] final class GenerateIds(cacheWrite: IdCache.Write, connPool: Co
     }
   }
 
-  private def faunaIdAsString(id: FValue): Result[Long] = {
+  private def faunaIdAsLong(id: FValue): Result[Long] = {
     id.to[String].map(toLong) getOrElse Err(s"Fauna did NOT returned a string ID. Value returned: $id")
   }
 
