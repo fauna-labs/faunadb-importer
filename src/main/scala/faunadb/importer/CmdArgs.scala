@@ -14,7 +14,7 @@ import java.net.URL
 import java.util
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util._
 import scopt._
 
 private[importer] object CmdArgs {
@@ -31,22 +31,24 @@ private[importer] object CmdArgs {
     import ContextBuilder.Dsl._
 
     head(
-      """faunadb-import 1.0-SNAPSHOT
+      """faunadb-import
         |For more information check https://github.com/fauna/faunadb-importer
         |""".stripMargin
     )
 
     opt[String]("secret")
-      .text("FaunaDB key's secret to use when authenticating requests")
-      .abbr("s")
+      .text("The FaunaDB key's secret to use")
       .required()
       .validate(notBlank("secret"))
       .foreach(c.config += Secret(_))
 
     opt[Seq[String]]("endpoints")
-      .text("FaunaDB endpoints's urls. The import load will be balanced across all endpoints")
+      .text(
+        "The FaunaDB endpoints' urls. " +
+          "The import will load balance requests across all endpoints. " +
+          "Defaults to FaunaDB Cloud."
+      )
       .valueName("<url,url...>")
-      .abbr("e")
       .validate { endpoints =>
         endpoints
           .find(url => !isValidUrl(url))
@@ -56,61 +58,50 @@ private[importer] object CmdArgs {
       .foreach(c.config += Endpoints(_))
 
     opt[Int]("batch-size")
-      .text("Number of queries to be grouped at a single batch")
-      .abbr("bs")
+      .text("Number of records to be grouped at a single batch. Default: 50.")
       .validate(biggerThanZero("Batch size"))
       .foreach(c.config += BatchSize(_))
 
     opt[Int]("max-requests-per-endpoint")
-      .text("The maximum number of concurrent requests per endpoint")
-      .abbr("me")
+      .text("The maximum number of concurrent requests per endpoint. Default: 4.")
       .validate(biggerThanZero("Max requests per endpoint"))
       .foreach(c.config += MaxRequestsPerEndpoint(_))
 
     opt[Int]("max-network-errors")
-      .text(
-        "The maximum number of network erros tolerated " +
-          "within the configured period of time")
-      .abbr("ne")
+      .text("The maximum number of network erros tolerated within the configured time frame: Default: 50.")
       .validate(biggerThanZero("Max network errors"))
       .foreach(c.config += MaxNetworkErrors(_))
 
     opt[Int]("reset-network-errors-period")
       .text(
-        "The number of seconds in which the network errors " +
-          "count will be reset if no new errors were found")
-      .abbr("re")
+        "The number of seconds in which the network errors count will be reset if no new errors were found. " +
+          "Default: 120.")
       .validate(biggerThanZero("Reset network errors period"))
       .foreach(n => c.config += NetworkErrorsResetTime(n.seconds))
 
     opt[Int]("network-errors-backoff-time")
-      .text(
-        "The number of seconds to delay new requests when " +
-          "the network is unstable")
-      .abbr("bt")
+      .text("The number of seconds to delay new requests when the network is unstable. Default: 1.")
       .validate(biggerThanZero("Network errors backoff time"))
       .foreach(n => c.config += NetworkErrorsBackoffTime(n.seconds))
 
-    opt[Int]("max-network-errors-backoff-time")
-      .text(
-        "The maximum number of seconds to delay new requests " +
-          "when applying explonential backoff")
-      .abbr("mb")
-      .validate(biggerThanZero("Max network errors backoff time"))
-      .foreach(n => c.config += MaxNetworkErrorsBackoffTime(n.seconds))
-
     opt[Int]("network-errors-backoff-factor")
-      .text(
-        "The factor used when exponentially backing off requests due " +
-          "to network instability")
-      .abbr("bf")
+      .text("The factor used when exponentially backoff requests when the network is unstable. Default: 2.")
       .validate(biggerThanZero("Network errors backoff factor"))
       .foreach(c.config += NetworkErrorsBackoffFactor(_))
 
+    opt[Int]("max-network-errors-backoff-time")
+      .text("The maximum number of seconds to delay new requests when applying explonential backoff. Default: 60.")
+      .validate(biggerThanZero("Max network errors backoff time"))
+      .foreach(n => c.config += MaxNetworkErrorsBackoffTime(n.seconds))
+
     opt[String]("error-strategy")
-      .text("The error strategy to be used")
+      .text(
+        """The error strategy to be used. Default: stop.
+          |          stop     Log and stop the import as soon as any error happens.
+          |          continue Log the error but continues the import process.
+        """.stripMargin
+      )
       .valueName(s"<stop|continue>")
-      .abbr("r")
       .validate(either("Error strategy", "stop", "continue"))
       .foreach {
         case "stop"     => c.config += OnError(ErrorStrategy.StopOnError)
@@ -118,9 +109,14 @@ private[importer] object CmdArgs {
       }
 
     opt[String]("report-type")
-      .text("Progress report strategy to use")
+      .text(
+        """Progress report strategy to be used. Default: inline.
+          |          inline  Report metrics in the same line. No console scrool.
+          |          detaild Report detailed metrics every 20 seconds. Multiple log lines.
+          |          silent  Do not report metrics.
+        """.stripMargin
+      )
       .valueName(s"<inline|detailed|silent>")
-      .abbr("t")
       .validate(either("Report type", "inline", "detailed", "silent"))
       .foreach {
         case "inline"   => c.config += Report(ReportType.Inline)
@@ -138,10 +134,7 @@ private[importer] object CmdArgs {
         .foreach(c.context.file),
 
       opt[Seq[String]]("format")
-        .text(
-          "Fields' definition in the following format: " +
-            "<field-name>[->new-name]:<field-type>[(config)],...")
-        .abbr("f")
+        .text("Fields' definition in the following format: <field-name>[->new-name]:<field-type>[(config)],...")
         .validate {
           _.foldLeft(success) { case (prev, field) =>
             prev.right flatMap { _ =>
@@ -166,22 +159,19 @@ private[importer] object CmdArgs {
 
       opt[String]("class")
         .text("The class in which the data will be imported")
-        .abbr("c")
         .required()
         .validate(notBlank("class"))
         .foreach(c.context += Clazz(_)),
 
       opt[Boolean]("skip-root")
-        .abbr("k")
         .text(
           "Configures the parser to ignore the first line for TSV/CSV " +
-            "files or to ignore first array element in JSON files"
+            "files or to ignore first array element in JSON files. Default: false."
         )
         .foreach(c.context += SkipRoot(_)),
 
       opt[Seq[String]]("ignore-fields")
         .text("Fields to be ignored when inserting data into FaunaDB")
-        .abbr("i")
         .validate { fields =>
           if (fields.forall(_.trim.nonEmpty)) success
           else failure("ignore-fields can't have a blank field")
@@ -190,7 +180,6 @@ private[importer] object CmdArgs {
 
       opt[String]("ts-field")
         .text("Field to be used as a timestamp for each inserted instance at FaunaDB")
-        .abbr("t")
         .validate(notBlank("ts-field"))
         .foreach(c.context += TSField(_))
     )

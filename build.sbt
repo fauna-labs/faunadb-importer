@@ -12,7 +12,6 @@ lazy val root = (project in file("."))
     javaOptions ++= Seq("-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:G1HeapRegionSize=4m", "-server"),
     fork := true,
 
-    // TODO: Check licences
     libraryDependencies ++= Seq(
       // Main
       "com.faunadb" %% "faunadb-scala" % "1.2.0",
