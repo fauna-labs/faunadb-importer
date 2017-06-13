@@ -1,11 +1,16 @@
 src/e2e/resources/users.json:
   class: users
+  tsField: created_at
   fields:
     - name: id
       type: ref
 
+    - name: created_at
+      type: ts
+
   ignoredFields:
     - id
+    - created_at
 
 src/e2e/resources/tweets.csv:
   class: tweets

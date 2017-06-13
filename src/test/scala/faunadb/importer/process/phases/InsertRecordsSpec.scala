@@ -54,6 +54,6 @@ class InsertRecordsSpec
           record1.copy(ts = Some(Scalar(pos, TimeT(None), "xxx")))
         )
       )
-    ) should have message "Can not use timestamp field for record at line: 0, column: 0: null. Invalid format: \"xxx\""
+    ) should have message "Can not use timestamp field for record at line: 0, column: 0: null. For input string: \"xxx\""
   }
 }
