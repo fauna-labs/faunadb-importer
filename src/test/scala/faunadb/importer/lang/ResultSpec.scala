@@ -6,7 +6,6 @@ class ResultSpec extends SimpleSpec {
 
   "A success" should "be a success" in {
     Ok(1).isSuccess shouldBe true
-    Ok(1).isFailure shouldBe false
   }
 
   it should "map" in {
@@ -22,7 +21,6 @@ class ResultSpec extends SimpleSpec {
   }
 
   "A error" should "be a failure" in {
-    Err("an error").isFailure shouldBe true
     Err("an error").isSuccess shouldBe false
   }
 

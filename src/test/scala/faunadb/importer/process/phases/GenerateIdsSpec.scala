@@ -10,7 +10,7 @@ class GenerateIdsSpec
     with ConcurrentUtils
     with Mocks {
 
-  val idCache = IdCache()
+  val idCache = new InMemoryIdCache()
 
   "The generate ids phase" should "generate ids for all records" in new MockedFauna {
     batchedQueryReturns(
@@ -32,7 +32,7 @@ class GenerateIdsSpec
     idCache shouldEqual allRecordsIds
   }
 
-  it should "fail on duplicated id" in new MockedFauna {
+  it should "fail on duplicated IDs" in new MockedFauna {
     batchedQueryReturns(
       StringV(record1.id),
       StringV(record1.id)
@@ -45,7 +45,7 @@ class GenerateIdsSpec
           record1
         )
       )
-    ) should have message "Duplicated id 1 found for record at line: 0, column: 0: null"
+    ) should have message "Duplicated ID 1 found for recored at: line: 0, column: 0: null"
   }
 
   it should "fail if fauna does not return a string id" in new MockedFauna {

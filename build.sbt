@@ -8,8 +8,18 @@ lazy val root = (project in file("."))
     name := "faunadb-importer",
     version := "1.0-SNAPSHOT",
     scalaVersion := "2.12.2",
-    scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings"),
-    javaOptions ++= Seq("-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:G1HeapRegionSize=4m", "-server"),
+    scalacOptions ++= Seq(
+      "-unchecked",
+      "-deprecation",
+      "-feature",
+      "-Xfatal-warnings"
+    ),
+    javaOptions ++= Seq(
+      "-server",
+      "-XX:+UseCompressedOops",
+      "-XX:+UseStringDeduplication",
+      "-Dmonix.environment.batchSize=128"
+    ),
     fork := true,
 
     // TODO: Check licences
@@ -23,6 +33,7 @@ lazy val root = (project in file("."))
       "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.8",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-csv" % "2.8.8",
       "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.8.8",
+      "org.mapdb" % "mapdb" % "3.0.4",
 
       // Test
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
@@ -54,7 +65,7 @@ lazy val root = (project in file("."))
     },
 
     scriptClasspath := Seq((assemblyJarName in assembly).value),
-    bashScriptExtraDefines += s"addJava ${javaOptions.value mkString " "}",
-    batScriptExtraDefines += s"set _JAVA_OPTS=%_JAVA_OPTS% ${javaOptions.value filter (_ != "-server") mkString " "}" // -server is not supported on Win32
+    bashScriptExtraDefines ++= javaOptions.value map (opt => s"""addJava "$opt""""),
+    batScriptExtraDefines ++= javaOptions.value filter (_ != "server") map (opt => s"set _JAVA_OPTS=%_JAVA_OPTS% $opt") // -server is not supported on Win32
   )
 

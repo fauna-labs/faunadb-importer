@@ -25,6 +25,7 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   private type RPair = (Record, Result[FValue])
   private type QBatch = Seq[QPair]
   private type RBatch = Seq[RPair]
+  private type Records = Seq[Record]
 
   private val backoff = new Backoff(
     maxErrors = c.config.maxNetworkErrors,
@@ -37,40 +38,50 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   protected def buildQuery(record: Record): Result[Expr]
 
   def run(records: Iterator[Record]): Future[Unit] = {
+    val consumerThreads =
+      Runtime.getRuntime.availableProcessors() * 2
+
     Observable
       .fromIterator(records)
-      .flatMap(buildQPair)
-      .transform(runQueries)
-      .consumeWith(Consumer.foreach(handleResult))
+      .transform(execute)
+      .consumeWith(
+        Consumer.foreachParallel(consumerThreads)(
+          handleResults
+        )
+      )
       .runAsync
   }
 
-  private def buildQPair(record: Record): Observable[QPair] = {
-    Observable.fromIterable(
-      ErrorHandler
-        .handle(buildQuery(record))
-        .map(record -> _)
-    )
-  }
-
-  private def handleResult(response: RPair): Unit = {
-    val (record, res) = response
-    ErrorHandler.handle(res) foreach { value =>
-      ErrorHandler.handle(handleResponse(record, value))
+  private def handleResults(response: RBatch): Unit = {
+    response foreach { case (record, res) =>
+      ErrorHandler.handle(res) foreach { value =>
+        ErrorHandler.handle(handleResponse(record, value))
+      }
     }
   }
 
-  private def runQueries(source: Observable[QPair]): Observable[RPair] = {
+  private def execute(source: Observable[Record]): Observable[RBatch] = {
     source
       .bufferTumbling(c.config.batchSize)
-      .mapAsync(connPool.maxConcurrentReferences)(pickClientAndRun)
+      .mapAsync(connPool.maxConcurrentReferences)(buildQueriesAndRun)
       .onErrorRecoverWith(handleWrongCredentials)
-      .mergeMap(Observable.fromIterable(_))
   }
 
-  private def pickClientAndRun(batch: QBatch): Task[RBatch] = {
-    val client = connPool.borrowClient()
-    runBatch(client, batch) doOnFinish (_ => Task.now(connPool.returnClient(client)))
+  private def buildQueriesAndRun(records: Records): Task[RBatch] = {
+    // Suspend execution because buildQueries is also IO bounded
+    Task.suspend {
+      val batch = buildQueries(records)
+      val client = connPool.borrowClient()
+      runBatch(client, batch) doOnFinish (_ => Task.now(connPool.returnClient(client)))
+    }
+  }
+
+  private def buildQueries(records: Records): QBatch = {
+    records flatMap { record =>
+      ErrorHandler.handle(buildQuery(record)) map { query =>
+        record -> query
+      }
+    }
   }
 
   private def runBatch(client: FaunaClient, batch: QBatch): Task[RBatch] = {
@@ -88,7 +99,7 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   private def splitBatchAndRetry(client: FaunaClient, batch: QBatch): Task[RBatch] = {
     Observable
       .fromIterable(batch)
-      .mapAsync(1)(pair => retryQPair(client, pair))
+      .mapTask(retryQPair(client, _))
       .toListL
   }
 
@@ -233,13 +244,15 @@ private[phases] trait PreserveValues extends QueryRunner {
 }
 
 private[phases] trait DiscardValues extends QueryRunner {
+  private val nulls =
+    Stream.continually(NullV)
+
   protected final def runQuery(client: FaunaClient, exprs: Seq[Expr]): Future[Seq[FValue]] = {
     client
       .query(Let(Seq("_" -> Arr(exprs: _*)), NullV))
-      .map(_ => Seq.fill(exprs.length)(NullV))
+      .map(_ => nulls.take(exprs.length))
   }
 
   // When discarding results you probably don't want to check the responses as well
-  protected def handleResponse(record: Record, value: FValue): Result[Unit] =
-    Ok(())
+  protected def handleResponse(record: Record, value: FValue): Result[Unit] = Result.unit
 }

@@ -49,7 +49,7 @@ object StatsReporter {
   }
 }
 
-private sealed trait StatsReporter {
+private trait StatsReporter {
   def start()
   def stop()
 }
@@ -85,10 +85,10 @@ private class InlineReporter extends StatsReporter {
     Seq(
       f"Progress: ${Stats.BytesRead.getCount / Math.max(1.0, Stats.BytesToRead.getCount) * 100}%.2f%%",
       s"Errors: ${Stats.ErrorsFound.getCount}",
-      f"RPS: ${Stats.ImportLatency.getMeanRate}%.2f",
-      f"Latency(client/server): " +
-        f"${Stats.ImportLatency.getSnapshot.getMedian * nanosToMills}%.2f/" +
-        f"${Stats.ServerLatency.getSnapshot.getMedian * nanosToMills}%.2f"
+      f"RPS: ${Stats.ImportLatency.getOneMinuteRate}%.2f",
+      "Latency(client/server): " +
+        f"${Stats.ImportLatency.getSnapshot.get99thPercentile * nanosToMills}%.2f/" +
+        f"${Stats.ServerLatency.getSnapshot.get99thPercentile * nanosToMills}%.2f"
     ) mkString " "
 }
 

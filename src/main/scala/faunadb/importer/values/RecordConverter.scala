@@ -6,11 +6,11 @@ import faunadb.importer.persistence._
 import faunadb.values.{ Value => FValue, _ }
 
 object RecordConverter {
-  def apply(idCache: IdCache)(record: Record)(implicit context: Context): Result[FValue] =
-    new RecordConverter(idCache, context, record).convert()
+  def apply(cacheRead: IdCache.Read)(record: Record)(implicit context: Context): Result[FValue] =
+    new RecordConverter(cacheRead, context, record).convert()
 }
 
-final class RecordConverter private(idCache: IdCache, context: Context, record: Record) {
+final class RecordConverter private(cacheRead: IdCache.Read, context: Context, record: Record) {
 
   def convert(): Result[FValue] = convertValue(record.data, 0)
 
@@ -46,19 +46,19 @@ final class RecordConverter private(idCache: IdCache, context: Context, record: 
     try {
       original match {
         case Scalar(_, _, raw) => expected match {
-          case SelfRefT    => Ok(StringV(record.id))
-          case StringT     => Ok(StringV(raw))
-          case LongT       => Ok(LongV(raw.toLong))
-          case DoubleT     => Ok(DoubleV(raw.toDouble))
-          case BoolT       => Ok(BooleanV(raw.toBoolean))
+          case SelfRefT => Ok(StringV(record.id))
+          case StringT  => Ok(StringV(raw))
+          case LongT    => Ok(LongV(raw.toLong))
+          case DoubleT  => Ok(DoubleV(raw.toDouble))
+          case BoolT    => Ok(BooleanV(raw.toBoolean))
 
           case ts: TimeT => Ok(ts.convert(raw, TimeV(_)).get)
           case dt: DateT => Ok(dt.convert(raw, DateV(_)).get)
 
           case RefT(clazz) =>
-            idCache.get(clazz, raw)
-              .map(id => Ok(RefV(s"classes/$clazz/$id")))
-              .getOrElse(Err(s"Can not find referenced id $raw for class $clazz at ${record.localized}"))
+            cacheRead.get(clazz, raw) map (id => Ok(RefV(s"classes/$clazz/$id"))) getOrElse {
+              Err(s"Can not find referenced id $raw for class $clazz at ${record.localized}")
+            }
         }
 
         case _: Null => Ok(NullV)

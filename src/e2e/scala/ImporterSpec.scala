@@ -54,7 +54,7 @@ class ImporterSpec
     )
 
   "The import tool" should "import a schema" in {
-    Import.IdCacheFile.delete()
+    Import.CacheFile.delete()
 
     Main.main(Array(
       "import-schema",

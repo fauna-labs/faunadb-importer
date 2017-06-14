@@ -23,7 +23,7 @@ private[parser] object TSV extends TextFileParser {
   }
 }
 
-private sealed abstract class TextFileParser extends Parser {
+private abstract class TextFileParser extends Parser {
   val name: String
   def parserFor(reader: Reader): CsvParser
   def parse(reader: Reader)(implicit context: Context): Iterator[Result[Value]] =

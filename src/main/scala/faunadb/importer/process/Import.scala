@@ -11,13 +11,16 @@ import scala.concurrent._
 import scala.concurrent.duration._
 
 object Import {
-  val IdCacheFile = new File("cache/ids")
+  val CacheFile = new File("cache/ids")
 
   def run(config: Config, filesToImport: Seq[(File, Context)]) {
     val pool = ConnectionPool(config.endpoints, config.secret, config.maxRequestsPerEndpoint)
 
     try {
-      for (step <- steps(pool, filesToImport)) step.run()
+      for (step <- steps(pool, filesToImport)) {
+        step.run()
+        step.close()
+      }
       Log.info("Import completed successfully")
     } catch {
       case e: ErrorHandler.Stop =>
@@ -35,74 +38,83 @@ object Import {
   }
 
   private def steps(connPool: ConnectionPool, filesToImport: Seq[(File, Context)]): Seq[Step] = {
+    val (files, _) = filesToImport.unzip
+
     val steps = Seq.newBuilder[Step]
-    steps += new IncBytesToRead(filesToImport)
+    steps += new IncBytesToRead(files)
 
-    val idCache = State.load[IdCache](IdCacheFile) match {
-      case Some(cachedIds) =>
-        Log.info("Using pre-generated ids...")
-        cachedIds
-
-      case None =>
-        val newCache = IdCache()
-        steps += new IncBytesToRead(filesToImport)
-        steps += new GenerateIds(connPool, newCache, filesToImport)
-        steps += new SavePregeneratedIds(newCache)
-        newCache
+    if (CacheFile.exists()) Log.info("Using pre-generated ids...") else {
+      steps += new IncBytesToRead(files)
+      steps += new GenerateIds(connPool, filesToImport)(
+        IdCache.openForWrite(CacheFile)
+      )
     }
 
-    steps += new InsertRecords(connPool, idCache, filesToImport)
+    steps += new InsertRecords(connPool, filesToImport)(
+      IdCache.openForRead(CacheFile)
+    )
     steps.result()
   }
 }
 
-private sealed trait Step {
+private trait Step {
   def run(): Unit
+  def close(): Unit
 }
 
-private sealed abstract class RunPhase(filesToLoad: Seq[(File, Context)]) extends Step {
+private trait NonCloseableStep extends Step {
+  def close(): Unit = ()
+}
 
-  def phase()(implicit c: Context): Phase
+private abstract class RunPhase[A <: CacheFile](filesToLoad: Seq[(File, Context)], openCache: => A)
+  extends Step {
+
+  private lazy val cache = openCache
+
+  def phase(idCache: A)(implicit c: Context): Phase
+  def close(): Unit = cache.close()
 
   def run(): Unit = for ((file, context) <- filesToLoad) {
     implicit val _ = context
-
-    val currentPhase = phase()
+    val currentPhase = phase(cache)
     Log.info(s"${currentPhase.description} for $file")
 
     InputParser(file) fold (
-      error => throw new IllegalStateException(error),
-      parser => Await.result(
-        currentPhase.run(
-          parser
-            .records()
-            .flatMap(ErrorHandler.handle(_))
-        ),
-        Duration.Inf
-      )
+      error =>
+        throw new IllegalStateException(error),
+
+      parser =>
+        try
+          Await.result(
+            currentPhase.run(
+              parser
+                .records()
+                .flatMap(ErrorHandler.handle(_))
+            ),
+            Duration.Inf
+          )
+        finally
+          parser.close()
     )
   }
 }
 
-private final class IncBytesToRead(filesToLoad: Seq[(File, Context)]) extends Step {
+private final class IncBytesToRead(filesToLoad: Seq[File]) extends NonCloseableStep {
   def run(): Unit =
-    for ((file, _) <- filesToLoad)
+    for (file <- filesToLoad)
       Stats.BytesToRead.inc(file.length())
 }
 
-private final class SavePregeneratedIds(idCache: IdCache) extends Step {
-  def run(): Unit =
-    State.store(Import.IdCacheFile, idCache)
+private final class GenerateIds(connPool: ConnectionPool, filesToLoad: Seq[(File, Context)])
+  (openCache: => IdCache.Write) extends RunPhase[IdCache.Write](filesToLoad, openCache) {
+
+  def phase(cacheWrite: IdCache.Write)(implicit c: Context): Phase =
+    GenerateIds(cacheWrite, connPool)
 }
 
-private final class GenerateIds(connPool: ConnectionPool, idCache: IdCache, filesToLoad: Seq[(File, Context)])
-  extends RunPhase(filesToLoad) {
-  def phase()(implicit c: Context): Phase =
-    GenerateIds(idCache, connPool)
-}
+private final class InsertRecords(connPool: ConnectionPool, filesToLoad: Seq[(File, Context)])
+  (openCache: => IdCache.Read) extends RunPhase[IdCache.Read](filesToLoad, openCache) {
 
-private final class InsertRecords(connPool: ConnectionPool, idCache: IdCache, filesToLoad: Seq[(File, Context)])
-  extends RunPhase(filesToLoad) {
-  def phase()(implicit c: Context): Phase =
-    InsertRecords(idCache, connPool)
+  def phase(cacheRead: IdCache.Read)(implicit c: Context): Phase =
+    InsertRecords(cacheRead, connPool)
 }

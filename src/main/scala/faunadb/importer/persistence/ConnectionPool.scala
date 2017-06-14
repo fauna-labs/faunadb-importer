@@ -25,19 +25,16 @@ private final class FaunaClientPool(endpoints: Seq[String], secret: String, maxR
   extends ConnectionPool {
 
   private val refCountByClient: Map[FaunaClient, AtomicInteger] = {
+    def newClient(endpoint: String = null): FaunaClient =
+      FaunaClient(secret, endpoint, httpClient = new HttpWrapper())
+
     val clients =
-      if (endpoints.isEmpty) Seq(newClient(None))
-      else endpoints map (url => newClient(Some(url)))
+      if (endpoints.isEmpty) Seq(newClient())
+      else endpoints.map(newClient)
 
-    clients.map(_ -> new AtomicInteger(0)).toMap
-  }
-
-  private def newClient(endpoint: Option[String]): FaunaClient = {
-    FaunaClient(
-      secret = secret,
-      endpoint = endpoint.orNull,
-      httpClient = new HttpWrapper()
-    )
+    clients
+      .map(_ -> new AtomicInteger(0))
+      .toMap
   }
 
   private val clientsByIndex = refCountByClient.toIndexedSeq
@@ -76,7 +73,7 @@ private final class FaunaClientPool(endpoints: Seq[String], secret: String, maxR
 
     if (pickedClient == null) {
       throw new IllegalStateException(
-        "Maximum number of concurrent references was reached." +
+        "Maximum number of concurrent references was reached. " +
           "Callers to bottowClient must respect the value of maxConcurrentReferences"
       )
     }

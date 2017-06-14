@@ -6,35 +6,31 @@ import scala.collection.{ IterableLike, mutable }
 
 final case class Ok[A](get: A) extends Result[A] {
   def error: String = throw new NoSuchElementException("Ok.error")
-  def isSuccess: Boolean = true
+  val isSuccess: Boolean = true
 }
 
 final case class Err[A](error: String) extends Result[A] {
   def get: A = throw new NoSuchElementException(s"Err($error).get")
-  def isSuccess: Boolean = false
+  val isSuccess: Boolean = false
 }
 
 sealed trait Result[+A] {
   def get: A
   def error: String
-
-  def isSuccess: Boolean
-  def isFailure: Boolean = !isSuccess
+  val isSuccess: Boolean
 
   @inline def map[B](f: A => B): Result[B] =
-    if (isSuccess) Ok(f(get))
-    else asInstanceOf[Result[B]]
+    if (isSuccess) Ok(f(get)) else asInstanceOf[Result[B]]
 
   @inline def flatMap[B](f: A => Result[B]): Result[B] =
-    if (isSuccess) f(get)
-    else asInstanceOf[Result[B]]
+    if (isSuccess) f(get) else asInstanceOf[Result[B]]
 
   @inline def fold[B](ifErr: String => B, ifSucc: A => B): B =
-    if (isSuccess) ifSucc(get)
-    else ifErr(error)
+    if (isSuccess) ifSucc(get) else ifErr(error)
 }
 
 object Result {
+  val unit: Result[Unit] = Ok(())
   def apply[A](value: A): Result[A] = Ok(value)
 }
 

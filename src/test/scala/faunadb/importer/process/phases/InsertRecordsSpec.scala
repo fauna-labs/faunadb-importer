@@ -29,7 +29,7 @@ class InsertRecordsSpec
 
   it should "fail if can't find id for record" in new MockedFauna {
     the[ErrorHandler.Stop] thrownBy await(
-      InsertRecords(IdCache(), connPool).run(
+      InsertRecords(new InMemoryIdCache(), connPool).run(
         Iterator(
           record1
         )
