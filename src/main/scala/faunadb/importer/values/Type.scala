@@ -2,42 +2,40 @@ package faunadb.importer.values
 
 import faunadb.importer.lang._
 import org.joda.time._
-import org.joda.time.format._
-import scala.util.Try
+import scala.util._
 
-sealed trait Type {val name: String}
-case class RefT(clazz: String) extends Type {val name = s"ref($clazz)"}
-case object SelfRefT extends Type {val name = "selfref"}
-case object StringT extends Type {val name = "string"}
-case object LongT extends Type {val name = "long"}
-case object DoubleT extends Type {val name = "double"}
-case object BoolT extends Type {val name = "boolean"}
+sealed abstract class Type(val name: String)
+case class RefT(clazz: String) extends Type(s"ref($clazz)")
+case object SelfRefT extends Type("selfref")
+case object StringT extends Type("string")
+case object LongT extends Type("long")
+case object DoubleT extends Type("double")
+case object BoolT extends Type("boolean")
 
-sealed trait DateTimeT[A] extends Type {
-  val format: Option[String]
-  val defaultFormatter: DateTimeFormatter
+sealed trait DateTimeT[A] {
+  this: Type =>
 
-  private lazy val formatter: DateTimeFormatter =
+  protected val format: Option[String]
+  protected val defaultParser: TimeParser
+  protected def convertDateTime(dt: DateTime): A
+
+  private lazy val parser =
     format
-      .map(DateTimeFormat.forPattern)
-      .getOrElse(defaultFormatter)
+      .map(StringPatternParser(_))
+      .getOrElse(defaultParser)
 
-  protected def convertUsing(formatter: DateTimeFormatter, raw: String): A
-  def convert[B](raw: String, f: A => B): Try[B] = Try(f(convertUsing(formatter, raw)))
+  def convert[B](raw: String, f: A => B): Try[B] =
+    parser.parse(raw) map (convertDateTime _ andThen f)
 }
 
-case class TimeT(format: Option[String]) extends DateTimeT[Instant] {
-  val name = "timestamp"
-  val defaultFormatter: DateTimeFormatter = ISODateTimeFormat.dateTimeParser()
-  protected def convertUsing(formatter: DateTimeFormatter, raw: String): Instant =
-    formatter.parseDateTime(raw).toInstant
+case class TimeT(format: Option[String]) extends Type("timestamp") with DateTimeT[Instant] {
+  protected val defaultParser: TimeParser = ISOTimeParser
+  protected def convertDateTime(dt: DateTime): Instant = dt.toInstant
 }
 
-case class DateT(format: Option[String]) extends DateTimeT[LocalDate] {
-  val name = "date"
-  val defaultFormatter: DateTimeFormatter = ISODateTimeFormat.yearMonthDay()
-  protected def convertUsing(formatter: DateTimeFormatter, raw: String): LocalDate =
-    formatter.parseDateTime(raw).toLocalDate
+case class DateT(format: Option[String]) extends Type("date") with DateTimeT[LocalDate] {
+  protected val defaultParser: TimeParser = StringPatternParser("yyyy-MM-dd")
+  protected def convertDateTime(dt: DateTime): LocalDate = dt.toLocalDate
 }
 
 object Type {
