@@ -1,8 +1,7 @@
 # FaunaDB Importer
 
-FaunaDB Importer is a command line utility to help users import static data into
-[FaunaDB](https://fauna.com/product). It works both for Cloud and for on
-premisses clusters.
+FaunaDB Importer is a command line utility to help you import static data into
+[FaunaDB](https://fauna.com/product). It works both for Cloud and on-premises clusters.
 
 Supported files:
 - JSON
@@ -32,46 +31,47 @@ For example:
   data/users.json
 ```
 
-The importer will load all data into the specified class, preserving the fields'
-names and types as they are described in the import file.
+The importer will load all data into the specified class, preserving the field
+names and types as described in the import file.
 
 You can also type `./bin/faunadb-importer --help` for more detailed information.
 
 ## How it works
 
-The importer is a stateful process separated in two phases: the id generation,
-and the data import.
+The importer is a stateful process separated into two phases: ID generation
+and data import.
 
-At first, the importer will parse all records and generate a fauna id for each
-record. Pre-generating ids beforehand allows us to import schemas containing
+First, the importer will parse all records and generate a Fauna ID for each
+record. Pre-generating IDs beforehand allows us to import schemas containing
 relational data while keeping foreign keys consistent. It also ensures that we
 can safely re-run the process without the risk of duplicating information.
 
-In order map legacy ids to new generated fauna ids, the importer will:
+In order to map legacy IDs to new generated Fauna IDs, the importer will:
 - Check if there is a field configured with the `ref` type. The field's value
-  will be used as the lookup term for the new fauna id.
-- If no field is configured with the`ref` type, the importer assign a sequential
-  number for each record as the lookup term for the new fauna id.
+  will be used as the lookup term for the new Fauna ID.
+- If no field is configured with the`ref` type, the importer will assign a sequential
+  number for each record as the lookup term for the new Fauna ID.
 
-Once this phase completes, the pre-generated ids will be stored at `cache/ids`.
-In case of a re-run, the importer will load the ids from disk and skip this
+Once this phase completes, the pre-generated IDs will be stored at `cache/ids`.
+In case of a re-run, the importer will load the IDs from disk and skip this
 phase.
 
-At the second phase, the importer will insert all records into FaunaDB, using
-the pre-generated id for each record as its [ref](https://fauna.com/documentation/queries#values-special_types)
+Second, the importer will insert all records into FaunaDB, using
+the pre-generated ID for each record as its [ref](https://fauna.com/documentation/queries#values-special_types)
 field.
 
 At this phase, if the import fails to run due to a data inconsistency, it is:
-- __NOT__ safe to change fields configured with the `ref` type as they will be
-  used as the lookup term for the pre-generated id from the first phase.
-- __NOT__ safe to remove entries from the import file if you don't have a field
-  configured as a `ref` field as it alters the sequential number assigned to the
-  record.
-- __SAFE__ to fix data inconsistencies in any field besides fields configured with
+- __SAFE__ to fix data inconsistencies in any field **except** fields configured with
   the `ref` type.
+- __NOT SAFE__ to change fields configured with the `ref` type as they will be
+  used as the lookup term for the pre-generated ID from the first phase.
+- __NOT SAFE__ to remove entries from the import file if you don't have a field
+  configured as a `ref` field; this will alter the sequential number assigned to the
+  record.
+
 
 As long as you keep `cache/ids` intact, it is safe to re-run the process until
-the import completes. That means that if you want to use the importer again with
+the import completes. If you want to use the importer again with
 a different input file, you __must__ clean the `cache` folder first.
 
 ### File structure
@@ -81,9 +81,9 @@ a different input file, you __must__ clean the `cache` folder first.
 ├── README.md                    # This file
 ├── bin                          #
 │   ├── faunadb-importer         # Unix startup script
-│   └── faunadb-importer.bat     # Winddows startup script
+│   └── faunadb-importer.bat     # Windows startup script
 ├── cache                        # Where the importer saves its cache
-├── data                         # Where you should copy the files you whish to import
+├── data                         # Where you should copy the files you wish to import
 ├── lib                          #
 │   └── faunadb-importer-1.0.jar # The importer library
 └── logs                         # Logs for each execution
@@ -93,9 +93,9 @@ a different input file, you __must__ clean the `cache` folder first.
 
 ### Configuring fields
 
-When importing `JSON` files, fields' names and types are optional but, when
+When importing `JSON` files, field names and types are optional; when
 importing text files, you must specify each field's name and type in order using
-the `--format` option, like:
+the `--format` option:
 
 ```
 ./bin/faunadb-importer \
@@ -151,7 +151,7 @@ For example:
 
 ### Ignoring root element
 
-When importing a `JSON` file where the root element of the file is a `array` or,
+When importing a `JSON` file where the root element of the file is an `array`, or
 when importing a text file where the first line is the file header, you can skip
 the root element with the `--skip-root` option. For example:
 
@@ -179,7 +179,7 @@ You can ignore fields with `--ignore-fields` option. For example:
 ```
 
 _NOTE_: In the example above, we're configuring `id` as a `ref` type so it will
-be used as the lookup term when resolving its fauna id but, we're configuring it
+be used as the lookup term when resolving its Fauna ID but, we're configuring it
 as an ignored field so we omit its value from the imported data.
 
 ### How to keep data in chronological order
@@ -196,13 +196,13 @@ option. For example:
   data/users.csv
 ```
 
-The field's value configured in the `--ts-field` option will be used as the `ts`
+The value configured in the `--ts-field` option will be used as the `ts`
 field for the imported instance.
 
-### Importing to your on cluster
+### Importing to your own cluster
 
-By default, the importer will load your data into FaunaDB Cloud. If you whish to
-import the data to your on cluster, you can use the `--endpoints` option. For
+By default, the importer will load your data into FaunaDB Cloud. If you wish to
+import the data to your own cluster, you can use the `--endpoints` option. For
 example:
 
 ```
