@@ -25,7 +25,7 @@ and extract the zip file. Inside the extracted folder, run:
   <file-to-import>
 ```
 
-__NOTE__: The command line arguments are the same on Windows but, you must use a
+__NOTE__: The command line arguments are the same on Windows, but you must use a
 different startup script. For example:
 
 ```
@@ -191,9 +191,7 @@ You can ignore fields with the `--ignore-fields` option. For example:
   data/users.csv
 ```
 
-_NOTE_: In the example above, we're configuring `id` as a `ref` type so it will
-be used as the lookup term when resolving its Fauna ID, but we're configuring it
-as an ignored field so we omit its value from the imported data.
+_NOTE_: In the above example, we omit the `id` field when importing the data into FaunaDB, but we still use the `id` field as the `ref` type so that the importer tool will properly map external IDs for data relating to Users.
 
 ### How to maintain data in chronological order
 
