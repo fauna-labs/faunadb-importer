@@ -281,22 +281,23 @@ private object SchemaFile {
       _ flatMapS { case (fileToImport, schema) =>
         toFile(fileToImport) map { file =>
           context.file(file)
-          context += Clazz(schema.clazz)
-          context += SkipRoot(schema.skipRoot)
-          context += TSField(schema.tsField)
-          schema.ignoredFields.asScala.foreach(context += Ignore(_))
-
-          schema.fields.asScala.flatMapS { fieldDef =>
+          Option(schema.clazz) foreach (context += Clazz(_))
+          Option(schema.skipRoot) foreach (context += SkipRoot(_))
+          Option(schema.skipRoot) foreach (context += SkipRoot(_))
+          Option(schema.tsField) foreach (context += TSField(_))
+          Option(schema.ignoredFields) foreach (_.asScala.foreach(context += Ignore(_)))
+          Option(schema.fields) foreach (_.asScala.flatMapS { fieldDef =>
             Type.byDefinition(fieldDef.tpe) map { tpe =>
               if (fieldDef.rename != null) context += Rename(fieldDef.name, fieldDef.rename)
               context += Field(fieldDef.name, tpe)
             }
-          }
+          })
         }
-      } map (_ => ())
-    } getOrElse
-      Err("Could not parse schema definition. " +
-        "Check the schema syntax as well as if all files names are correct.")
+      }
+    } fold (
+      err => Err(s"Could not parse schema definition. ${err.getMessage}"),
+      res => res map (_ => ())
+    )
   }
 
   private def readSchemaDefinition(file: File): Try[Seq[(String, SchemaFile)]] = Try {

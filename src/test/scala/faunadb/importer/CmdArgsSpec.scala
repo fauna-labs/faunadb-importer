@@ -37,6 +37,14 @@ class CmdArgsSpec extends SimpleSpec {
         "src/test/resources/schema.yaml"
       )
     ) shouldNot be(None)
+
+    CmdArgs.parse(
+      Array(
+        "import-schema",
+        "--secret", "abc",
+        "src/test/resources/min-schema.yaml"
+      )
+    ) shouldNot be(None)
   }
 
 }

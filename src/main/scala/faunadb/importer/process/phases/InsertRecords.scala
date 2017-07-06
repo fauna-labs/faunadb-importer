@@ -8,15 +8,15 @@ import faunadb.query._
 import faunadb.values.{ Value => FValue, _ }
 
 private[process] object InsertRecords {
-  def apply(idCache: IdCache, connPool: ConnectionPool)(implicit c: Context): InsertRecords =
-    new InsertRecords(idCache, connPool)
+  def apply(cacheRead: IdCache.Read, connPool: ConnectionPool)(implicit c: Context): InsertRecords =
+    new InsertRecords(cacheRead, connPool)
 }
 
-private[process] final class InsertRecords(idCache: IdCache, connPool: ConnectionPool)(implicit c: Context)
+private[process] final class InsertRecords(cacheRead: IdCache.Read, connPool: ConnectionPool)(implicit c: Context)
   extends Phase("Inserting records", connPool)
     with DiscardValues {
 
-  private val toFauna: (Record) => Result[FValue] = RecordConverter(idCache)
+  private val toFauna: (Record) => Result[FValue] = RecordConverter(cacheRead)
 
   protected def buildQuery(record: Record): Result[Expr] = {
     for {
@@ -28,7 +28,7 @@ private[process] final class InsertRecords(idCache: IdCache, connPool: Connectio
   }
 
   private def refFor(record: Record): Result[RefV] = {
-    idCache.get(c.clazz, record.id) map { newId =>
+    cacheRead.get(c.clazz, record.id) map { newId =>
       Ok(RefV(
         s"classes/${c.clazz}/$newId"
       ))
