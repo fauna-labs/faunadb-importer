@@ -191,7 +191,7 @@ You can ignore fields with the `--ignore-fields` option. For example:
   data/users.csv
 ```
 
-_NOTE_: In the above example, we omit the `id` field when importing the data into FaunaDB, but we still use the `id` field as the `ref` type so that the importer tool will properly map external IDs for data relating to Users.
+_NOTE_: In the above example, we omit the `id` field when importing the data into FaunaDB, but we still use the `id` field as the `ref` type so that the importer tool will properly map the newly-generated Fauna ID for that specific user.
 
 ### How to maintain data in chronological order
 
