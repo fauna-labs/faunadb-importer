@@ -22,7 +22,6 @@ lazy val root = (project in file("."))
     ),
     fork := true,
 
-    // TODO: Check licences
     libraryDependencies ++= Seq(
       // Main
       "com.faunadb" %% "faunadb-scala" % "1.2.0",
