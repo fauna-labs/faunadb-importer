@@ -115,7 +115,7 @@ the `--format` option:
   import-file \
   --secret "<your-keys-secret-here>" \
   --class <your-class-name> \
-  --format "<field-name>:<field-type>,..."
+  --format "<field-name>:<field-type>,..." \
   <file-to-import>
 ```
 
@@ -173,7 +173,7 @@ the root element with the `--skip-root` option. For example:
   import-file \
   --secret "abc" \
   --class users \
-  --skip-root true
+  --skip-root true \
   data/users.csv
 ```
 
@@ -187,7 +187,7 @@ You can ignore fields with the `--ignore-fields` option. For example:
   --secret "abc" \
   --class users \
   --format "id:ref, username->userName:string, vip->VIP:bool" \
-  --ignore-fields "id"
+  --ignore-fields "id" \
   data/users.csv
 ```
 
@@ -203,7 +203,7 @@ You can maintain chronological order when importing data by using the
   import-file \
   --secret "abc" \
   --class users \
-  --ts-field "created_at"
+  --ts-field "created_at" \
   data/users.csv
 ```
 
@@ -221,7 +221,7 @@ example:
   import-file \
   --secret "abc" \
   --class users \
-  --endpoints "http://10.0.0.120:8443, http://10.0.0.121:8443"
+  --endpoints "http://10.0.0.120:8443, http://10.0.0.121:8443" \
   data/users.csv
 ```
 
