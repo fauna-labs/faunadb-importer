@@ -10,7 +10,7 @@ Supported input file formats:
 - TSV
 
 Requirements:
-- Java 8+
+- Java 8
 
 ## Usage
 
