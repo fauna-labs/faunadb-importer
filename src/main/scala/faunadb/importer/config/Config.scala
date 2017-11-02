@@ -16,8 +16,8 @@ case class Config(
   // Number of queries to be executed at a single batch
   batchSize: Int = 50,
 
-  // Maximum number of concurrent requests per endpoint
-  maxRequestsPerEndpoint: Int = 4,
+  // Number of parallel streams used to send request to the server
+  concurrentStreams: Int = Runtime.getRuntime.availableProcessors() * 2,
 
   // Maximum number of network errors tolerated
   maxNetworkErrors: Int = 50,
@@ -69,9 +69,9 @@ object ConfigBuilder {
     def Secret(value: String): BuildStep = _.copy(secret = value)
     def Endpoints(value: Seq[String]): BuildStep = _.copy(endpoints = value)
     def BatchSize(value: Int): BuildStep = _.copy(batchSize = value)
+    def ConcurrentStreams(value: Int): BuildStep = _.copy(concurrentStreams = value)
     def OnError(value: ErrorStrategy): BuildStep = _.copy(errorStrategy = value)
     def Report(value: ReportType): BuildStep = _.copy(reportType = value)
-    def MaxRequestsPerEndpoint(value: Int): BuildStep = _.copy(maxRequestsPerEndpoint = value)
     def MaxNetworkErrors(value: Int): BuildStep = _.copy(maxNetworkErrors = value)
     def NetworkErrorsResetTime(value: FiniteDuration): BuildStep = _.copy(networkErrorsResetTime = value)
     def NetworkErrorsBackoffTime(value: FiniteDuration): BuildStep = _.copy(networkErrorsBackoffTime = value)

@@ -62,10 +62,12 @@ private[importer] object CmdArgs {
       .validate(biggerThanZero("Batch size"))
       .foreach(c.config += BatchSize(_))
 
-    opt[Int]("max-requests-per-endpoint")
-      .text("The maximum number of concurrent requests per endpoint. Default: 4.")
-      .validate(biggerThanZero("Max requests per endpoint"))
-      .foreach(c.config += MaxRequestsPerEndpoint(_))
+    opt[Int]("concurrent-streams")
+      .text(
+        "Number of concurrent streams used to send requests to the cluster. " +
+          "Default: the number of available processors * 2")
+      .validate(biggerThanZero("Concurrent streams"))
+      .foreach(c.config += ConcurrentStreams(_))
 
     opt[Int]("max-network-errors")
       .text("The maximum number of network errors tolerated within the configured timeframe: Default: 50.")

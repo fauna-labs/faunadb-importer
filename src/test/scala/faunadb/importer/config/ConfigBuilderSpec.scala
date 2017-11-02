@@ -12,7 +12,7 @@ class ConfigBuilderSpec extends SimpleSpec {
     builder += Secret("abc")
     builder += Endpoints(Seq("url1", "url2"))
     builder += BatchSize(2)
-    builder += MaxRequestsPerEndpoint(3)
+    builder += ConcurrentStreams(2)
     builder += OnError(ErrorStrategy.DoNotStop)
 
     builder.result() shouldBe Ok(
@@ -20,7 +20,7 @@ class ConfigBuilderSpec extends SimpleSpec {
         secret = "abc",
         endpoints = Seq("url1", "url2"),
         batchSize = 2,
-        maxRequestsPerEndpoint = 3,
+        concurrentStreams = 2,
         errorStrategy = ErrorStrategy.DoNotStop
       )
     )

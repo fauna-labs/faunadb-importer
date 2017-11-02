@@ -17,8 +17,7 @@ lazy val root = (project in file("."))
     javaOptions ++= Seq(
       "-server",
       "-XX:+UseCompressedOops",
-      "-XX:+UseStringDeduplication",
-      "-Dmonix.environment.batchSize=128"
+      "-XX:+UseStringDeduplication"
     ),
     fork := true,
 
