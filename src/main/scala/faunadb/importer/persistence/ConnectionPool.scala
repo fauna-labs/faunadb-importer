@@ -31,13 +31,14 @@ private final class SingleConnPool(client: FaunaClient) extends ConnectionPool {
 
 private final class MultipleConnPool(clients: Seq[FaunaClient]) extends ConnectionPool {
   @volatile
-  private[this] var searchIndex = -1
+  private[this] var searchIndex = 0
   private[this] val clientsByIndex = clients.toIndexedSeq
   private[this] val poolSize = clients.size
 
   def pickClient(): FaunaClient = {
-    searchIndex = Math.max((searchIndex + 1) % poolSize, 0)
-    clientsByIndex(searchIndex)
+    val client = clientsByIndex(searchIndex)
+    searchIndex = (searchIndex + 1) % poolSize
+    client
   }
 
   def close(): Unit = clients foreach (_.close())
