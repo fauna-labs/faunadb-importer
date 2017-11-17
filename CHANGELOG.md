@@ -1,3 +1,5 @@
+2.0.1-SNAPSHOT
+
 2.0.0
 * Improvements for I/O bounded parallelism
 * Replace option "max-requests-per-endpoint" with "concurrent-streams"
