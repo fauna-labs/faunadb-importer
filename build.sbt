@@ -6,7 +6,7 @@ lazy val root = (project in file("."))
   .configs(E2ETest)
   .settings(
     name := "faunadb-importer",
-    version := "1.0.1-SNAPSHOT",
+    version := "2.0.0",
     scalaVersion := "2.12.2",
     scalacOptions ++= Seq(
       "-unchecked",

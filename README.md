@@ -326,17 +326,13 @@ Default: 50 records per batch.
 
 ### Managing concurrency
 
-Concurrency is configured using the `--max-requests-per-endpoint` parameter.
+Concurrency is configured using the `--concurrent-streams` parameter.
 
-In practice, the number of concurrent requests is the number of
-`max-requests-per-endpoint` multiplied by the number of endpoints configured by
-the `endpoints` parameter.
-
-A large number of concurrent requests can cause timeouts. When timeouts happen,
+A large number of concurrent streams can cause timeouts. When timeouts happen,
 the import tool will retry failing requests applying exponential backoff to each
 request.
 
-Default: 4 concurrent requests per endpoint.
+Default: the number of available processors * 2
 
 ### Backoff configuration
 
