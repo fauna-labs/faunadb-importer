@@ -9,25 +9,29 @@ import faunadb.importer.lang._
 import faunadb.importer.persistence._
 import faunadb.importer.report._
 import faunadb.importer.values._
-import faunadb.query.{ Arr, Expr, Let }
+import faunadb.query.{ Arr, Do, Expr }
 import faunadb.values.{ NullV, Value => FValue }
 import java.io._
 import monix.eval._
 import monix.execution.atomic._
 import monix.reactive._
+import scala.annotation.tailrec
 import scala.concurrent._
 import scala.concurrent.duration._
 
 private[process] abstract class Phase(val description: String, connPool: ConnectionPool)(implicit c: Context) {
   this: QueryRunner =>
 
-  private type QPair = (Record, Expr)
-  private type RPair = (Record, Result[FValue])
-  private type QBatch = Seq[QPair]
-  private type RBatch = Seq[RPair]
   private type Records = Seq[Record]
+  private type QueryBatch = (Seq[Record], Seq[Expr])
+  private type SuccessfulBatch = (Seq[Record], Seq[FValue])
+  private type RetryQuery = (Record, Expr)
+  private type RetryBatch = Seq[RetryQuery]
+  private type RetriedPair = (Record, Result[FValue])
+  private type RetriedBatch = Seq[RetriedPair]
+  private type BatchResult = Either[RetriedBatch, SuccessfulBatch]
 
-  private val backoff = new Backoff(
+  private[this] val backoff = new Backoff(
     maxErrors = c.config.maxNetworkErrors,
     resetTime = c.config.networkErrorsResetTime,
     backoffTime = c.config.networkErrorsBackoffTime,
@@ -38,81 +42,93 @@ private[process] abstract class Phase(val description: String, connPool: Connect
   protected def buildQuery(record: Record): Result[Expr]
 
   def run(records: Iterator[Record]): Future[Unit] = {
-    val consumerThreads =
-      Runtime.getRuntime.availableProcessors() * 2
-
     Observable
       .fromIterator(records)
-      .transform(execute)
+      .bufferTumbling(c.config.batchSize)
       .consumeWith(
-        Consumer.foreachParallel(consumerThreads)(
-          handleResults
-        )
+        Consumer.foreachParallelAsync(
+          c.config.concurrentStreams)(execute)
       )
       .runAsync
   }
 
-  private def handleResults(response: RBatch): Unit = {
-    response foreach { case (record, res) =>
-      ErrorHandler.handle(res) foreach { value =>
-        ErrorHandler.handle(handleResponse(record, value))
-      }
-    }
-  }
-
-  private def execute(source: Observable[Record]): Observable[RBatch] = {
-    source
-      .bufferTumbling(c.config.batchSize)
-      .mapAsync(connPool.maxConcurrentReferences)(buildQueriesAndRun)
+  private def execute(batch: Records): Task[Unit] = {
+    runBatch(connPool.pickClient(), buildQueries(batch))
       .onErrorRecoverWith(handleWrongCredentials)
+      .foreachL(handleResults)
   }
 
-  private def buildQueriesAndRun(records: Records): Task[RBatch] = {
-    // Suspend execution because buildQueries is also IO bounded
-    Task.suspend {
-      val batch = buildQueries(records)
-      val client = connPool.borrowClient()
-      runBatch(client, batch) doOnFinish (_ => Task.now(connPool.returnClient(client)))
-    }
-  }
+  private def buildQueries(batch: Records): QueryBatch = {
+    val records = Seq.newBuilder[Record]
+    val queries = Seq.newBuilder[Expr]
 
-  private def buildQueries(records: Records): QBatch = {
-    records flatMap { record =>
-      ErrorHandler.handle(buildQuery(record)) map { query =>
-        record -> query
+    batch foreach { record =>
+      ErrorHandler.handle(buildQuery(record)) foreach { query =>
+        records += record
+        queries += query
       }
     }
+
+    (records.result(), queries.result())
   }
 
-  private def runBatch(client: FaunaClient, batch: QBatch): Task[RBatch] = {
-    val (records, exprs) = batch.unzip
+  private def runBatch(client: FaunaClient, batch: QueryBatch): Task[BatchResult] = {
+    val (records, queries) = batch
 
-    backoff(Stats.ImportLatency.measure(runQuery(client, exprs)))
-      .map(res => records zip res.map(Result(_)))
-      .onErrorRecoverWith {
-        handleQueryErrorsWith { _ =>
-          splitBatchAndRetry(client, batch)
-        }
-      }
+    backoff(Stats.ImportLatency.measure(runQuery(client, queries)))
+      .map(values => Right((records, values)))
+      .onErrorRecoverWith(
+        handleQueryErrorsWith(_ =>
+          splitBatchAndRetry(client, records zip queries) map (Left(_))
+        )
+      )
   }
 
-  private def splitBatchAndRetry(client: FaunaClient, batch: QBatch): Task[RBatch] = {
+  private def splitBatchAndRetry(client: FaunaClient, retryBatch: RetryBatch): Task[RetriedBatch] = {
     Observable
-      .fromIterable(batch)
-      .mapTask(retryQPair(client, _))
+      .fromIterable(retryBatch)
+      .mapTask(retryQuery(client, _))
       .toListL
   }
 
-  private def retryQPair(client: FaunaClient, pair: QPair): Task[RPair] = {
+  private def retryQuery(client: FaunaClient, pair: RetryQuery): Task[RetriedPair] = {
     val (record, expr) = pair
 
     backoff(Stats.ImportLatency.measure(client.query(expr)))
       .map(record -> Result(_))
-      .onErrorRecover {
-        handleQueryErrorsWith { e =>
+      .onErrorRecover(
+        handleQueryErrorsWith(e =>
           record -> Err(s"${e.getMessage} at ${record.localized}")
-        }
+        )
+      )
+  }
+
+  private def handleResults(response: BatchResult): Unit = {
+    response match {
+      case Right(successfulBatch) => handleSuccessfulBatch(successfulBatch)
+      case Left(retriedBatch)     => handleRetriedBatch(retriedBatch)
+    }
+  }
+
+  private def handleSuccessfulBatch(successfulBatch: SuccessfulBatch): Unit = {
+    @tailrec
+    def loop0(records: Records, values: Seq[FValue]): Unit = {
+      if (records.nonEmpty) {
+        ErrorHandler.handle(handleResponse(records.head, values.head))
+        loop0(records.tail, values.tail)
       }
+    }
+
+    val (records, values) = successfulBatch
+    loop0(records, values)
+  }
+
+  private def handleRetriedBatch(retriedBatch: RetriedBatch): Unit = {
+    retriedBatch foreach { case (record, retriedValue) =>
+      ErrorHandler.handle(retriedValue) foreach { value =>
+        ErrorHandler.handle(handleResponse(record, value))
+      }
+    }
   }
 
   private def handleQueryErrorsWith[B](handle: (Throwable) => B): PartialFunction[Throwable, B] = {
@@ -127,11 +143,11 @@ private[process] abstract class Phase(val description: String, connPool: Connect
       handle(e)
   }
 
-  private val handleWrongCredentials: PartialFunction[Throwable, Observable[Nothing]] = {
+  private val handleWrongCredentials: PartialFunction[Throwable, Task[Nothing]] = {
     case e @ (_: UnauthorizedException |
               _: PermissionDeniedException) =>
       Log.info("Invalid key. You must provide a valid SERVER key.")
-      Observable.raiseError(e)
+      Task.raiseError(e)
   }
 }
 
@@ -151,12 +167,12 @@ private final class Backoff(
     def hasErrors: Boolean = totalErrors > 0
     def isOverMax: Boolean = totalErrors > maxErrors
     def isUnstable: Boolean = totalErrors > maxErrors / 2
-    def isExpired: Boolean = lastErrorTs < scheduler.currentTimeMillis() - resetTime.toMillis
+    def isExpired: Boolean = lastErrorTs < Scheduler.currentTimeMillis() - resetTime.toMillis
 
     def inc(): State = {
       State(
         totalErrors + 1,
-        scheduler.currentTimeMillis(),
+        Scheduler.currentTimeMillis(),
         incBackoffDelay()
       )
     }
@@ -170,8 +186,8 @@ private final class Backoff(
     }
   }
 
-  private final val ZeroState = State(0, 0, Duration.Zero)
-  private final val state = Atomic(ZeroState)
+  private[this] final val ZeroState = State(0, 0, Duration.Zero)
+  private[this] final val state = Atomic(ZeroState)
 
   def apply[A](thunk: => Future[A]): Task[A] = {
     val s = state.get
@@ -244,12 +260,12 @@ private[phases] trait PreserveValues extends QueryRunner {
 }
 
 private[phases] trait DiscardValues extends QueryRunner {
-  private val nulls =
+  private[this] val nulls =
     Stream.continually(NullV)
 
   protected final def runQuery(client: FaunaClient, exprs: Seq[Expr]): Future[Seq[FValue]] = {
     client
-      .query(Let(Seq("_" -> Arr(exprs: _*)), NullV))
+      .query(Do(Arr(exprs: _*), NullV))
       .map(_ => nulls.take(exprs.length))
   }
 

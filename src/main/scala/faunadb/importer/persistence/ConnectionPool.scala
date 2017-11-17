@@ -5,94 +5,43 @@ import com.ning.http.client._
 import faunadb._
 import faunadb.importer.report._
 import java.util.concurrent.TimeUnit._
-import java.util.concurrent.atomic._
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
 trait ConnectionPool {
-  def borrowClient(): FaunaClient
-  def returnClient(client: FaunaClient): Unit
-  def maxConcurrentReferences: Int
+  def pickClient(): FaunaClient
   def close(): Unit
 }
 
 object ConnectionPool {
-  def apply(endpoints: Seq[String], secret: String, maxRefCountPerEndpoint: Int): ConnectionPool =
-    new FaunaClientPool(endpoints, secret, maxRefCountPerEndpoint)
+  def apply(endpoints: Seq[String], secret: String): ConnectionPool = {
+    val httpWrapper = new HttpWrapper // Reuse http client
+
+    endpoints match {
+      case endpoint :: Nil => new SingleConnPool(FaunaClient(secret, endpoint, httpClient = httpWrapper))
+      case Nil             => new SingleConnPool(FaunaClient(secret, httpClient = httpWrapper))
+      case _               => new MultipleConnPool(endpoints map (FaunaClient(secret, _, httpClient = httpWrapper)))
+    }
+  }
 }
 
-private final class FaunaClientPool(endpoints: Seq[String], secret: String, maxRefCountPerEndpoint: Int)
-  extends ConnectionPool {
+private final class SingleConnPool(client: FaunaClient) extends ConnectionPool {
+  def pickClient(): FaunaClient = client
+  def close(): Unit = client.close()
+}
 
-  private val refCountByClient: Map[FaunaClient, AtomicInteger] = {
-    def newClient(endpoint: String = null): FaunaClient =
-      FaunaClient(secret, endpoint, httpClient = new HttpWrapper())
-
-    val clients =
-      if (endpoints.isEmpty) Seq(newClient())
-      else endpoints.map(newClient)
-
-    clients
-      .map(_ -> new AtomicInteger(0))
-      .toMap
-  }
-
-  private val clientsByIndex = refCountByClient.toIndexedSeq
-  private val poolSize = refCountByClient.size
-
-  val maxConcurrentReferences: Int = maxRefCountPerEndpoint * poolSize
-
+private final class MultipleConnPool(clients: Seq[FaunaClient]) extends ConnectionPool {
   @volatile
-  private var searchIndex = -1
+  private[this] var searchIndex = 0
+  private[this] val clientsByIndex = clients.toIndexedSeq
+  private[this] val poolSize = clients.size
 
-  @tailrec
-  def borrowClient(): FaunaClient = {
-    var pickedClient: FaunaClient = null
-    var pickedRefCount: AtomicInteger = null
-    var minRefCountFound = Int.MaxValue
-
-    // Start from a different position everytime so we don't
-    // prefer the first few clients in the pool
-    searchIndex = Math.max((searchIndex + 1) % poolSize, 0)
-    val startIndex = searchIndex
-    var walked = 0
-
-    while (walked < poolSize) {
-      val (client, refCount) = clientsByIndex(Math.max((startIndex + walked) % poolSize, 0))
-      val currentCount = refCount.get()
-
-      // Prefer the client with less references to it
-      if (currentCount < minRefCountFound && currentCount < maxRefCountPerEndpoint) {
-        minRefCountFound = currentCount
-        pickedRefCount = refCount
-        pickedClient = client
-      }
-
-      walked += 1
-    }
-
-    if (pickedClient == null) {
-      throw new IllegalStateException(
-        "Maximum number of concurrent references was reached. " +
-          "Callers to bottowClient must respect the value of maxConcurrentReferences"
-      )
-    }
-
-    if (!pickedRefCount.compareAndSet(minRefCountFound, minRefCountFound + 1)) {
-      // Another thread got the client first. Retry!
-      borrowClient()
-    } else {
-      pickedClient
-    }
+  def pickClient(): FaunaClient = {
+    val client = clientsByIndex(searchIndex)
+    searchIndex = (searchIndex + 1) % poolSize
+    client
   }
 
-  def returnClient(client: FaunaClient): Unit = {
-    refCountByClient.get(client) foreach (_.decrementAndGet())
-  }
-
-  def close(): Unit = {
-    refCountByClient.keys foreach (_.close())
-  }
+  def close(): Unit = clients foreach (_.close())
 }
 
 private final class HttpWrapper extends AsyncHttpClient(

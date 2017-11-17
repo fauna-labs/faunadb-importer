@@ -14,7 +14,7 @@ object Import {
   val CacheFile = new File("cache/ids")
 
   def run(config: Config, filesToImport: Seq[(File, Context)]) {
-    val pool = ConnectionPool(config.endpoints, config.secret, config.maxRequestsPerEndpoint)
+    val pool = ConnectionPool(config.endpoints, config.secret)
 
     try {
       for (step <- steps(pool, filesToImport)) {
