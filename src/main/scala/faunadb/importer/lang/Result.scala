@@ -36,7 +36,7 @@ object Result {
 
 trait ShortCircuit {
   implicit class SeqResultSC[Repr, A](self: IterableLike[A, Repr]) {
-    def flatMapS[B, That](f: (A) => Result[B])(implicit cbf: CanBuildFrom[Repr, B, That]): Result[That] = {
+    def flatMapS[B, That](f: A => Result[B])(implicit cbf: CanBuildFrom[Repr, B, That]): Result[That] = {
       @tailrec
       def loop0(res: mutable.Builder[B, That], seq: Iterable[A]): Result[That] = {
         if (seq.isEmpty) Ok(res.result()) else f(seq.head) match {

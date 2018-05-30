@@ -12,7 +12,7 @@ class RecordConverterSpec extends ContextSpec with DataFixtures {
     ignoredFields = Set("old_field")
   )
 
-  val toFauna: (Record) => Result[FValue] = RecordConverter(allRecordsIds)
+  val toFauna: Record => Result[FValue] = RecordConverter(allRecordsIds)
 
   "The record converter" should "convert from AST to fauna values" in {
     toFauna(Record("0", None, Null(pos))) shouldBe Ok(NullV)
@@ -21,7 +21,7 @@ class RecordConverterSpec extends ContextSpec with DataFixtures {
     toFauna(Record("0", None, Scalar(pos, DoubleT, "10.2"))) shouldBe Ok(DoubleV(10.2))
     toFauna(Record("0", None, Scalar(pos, BoolT, "true"))) shouldBe Ok(BooleanV(true))
     toFauna(Record("0", None, Scalar(pos, SelfRefT, "1"))) shouldBe Ok(StringV("0"))
-    toFauna(Record("0", None, Scalar(pos, RefT(aClass), "2"))) shouldBe Ok(RefV(s"classes/$aClass/${record2.id}"))
+    toFauna(Record("0", None, Scalar(pos, RefT(aClass), "2"))) shouldBe Ok(RefV(record2.id, RefV(aClass, Native.Classes)))
     toFauna(Record("0", None, Scalar(pos, TimeT(None), "1"))) shouldBe Ok(TimeV("1970-01-01T00:00:00.001Z"))
     toFauna(Record("0", None, Scalar(pos, TimeT(Some("yyyy-MM-dd HH:mm:ss")), "2017-01-15 22:10:12"))) shouldBe Ok(TimeV("2017-01-15T22:10:12.000Z"))
     toFauna(Record("0", None, Scalar(pos, DateT(Some("yyyy")), "2017"))) shouldBe Ok(DateV("2017"))

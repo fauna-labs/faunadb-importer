@@ -56,7 +56,7 @@ final class RecordConverter private(cacheRead: IdCache.Read, context: Context, r
           case dt: DateT => Ok(dt.convert(raw, DateV(_)).get)
 
           case RefT(clazz) =>
-            cacheRead.get(clazz, raw) map (id => Ok(RefV(s"classes/$clazz/$id"))) getOrElse {
+            cacheRead.get(clazz, raw) map (id => Ok(RefV(id.toString, RefV(clazz, Native.Classes)))) getOrElse {
               Err(s"Can not find referenced id $raw for class $clazz at ${record.localized}")
             }
         }

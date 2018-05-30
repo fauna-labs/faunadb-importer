@@ -3,7 +3,7 @@ package faunadb.importer.lang
 import java.io.Reader
 
 object MonitoredIOReader {
-  type Callback = (Long) => Unit
+  type Callback = Long => Unit
 
   def apply(delegate: Reader)(fn: Callback): MonitoredIOReader =
     new MonitoredIOReader(fn, delegate)

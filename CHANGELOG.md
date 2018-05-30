@@ -1,4 +1,5 @@
 2.0.1-SNAPSHOT
+* Upgrade faunadb-jvm driver to version 2.2.0
 
 2.0.0
 * Improvements for I/O bounded parallelism
