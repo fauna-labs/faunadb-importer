@@ -86,7 +86,7 @@ class ImporterSpec
         ObjectV(
           "user" -> StringV("Marry the owl"),
           "user_since" -> TimeV("2016-12-24T23:58:25.000000000Z"),
-          "tweet" -> StringV("Hellow"),
+          "tweet" -> StringV("Hello"),
           "ts" -> TimeV("2016-12-25T00:01:36.000000000Z")
         ),
         ObjectV(

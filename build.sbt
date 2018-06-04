@@ -23,7 +23,7 @@ lazy val root = (project in file("."))
 
     libraryDependencies ++= Seq(
       // Main
-      "com.faunadb" %% "faunadb-scala" % "1.2.0",
+      "com.faunadb" %% "faunadb-scala" % "2.2.0",
       "io.monix" %% "monix" % "2.3.0",
       "com.github.scopt" %% "scopt" % "3.5.0",
       "ch.qos.logback" % "logback-classic" % "1.2.3",

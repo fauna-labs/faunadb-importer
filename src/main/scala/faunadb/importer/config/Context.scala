@@ -78,7 +78,7 @@ final class ContextBuilder {
 
 
 object ContextBuilder {
-  type BuildStep = (Context => Result[Context])
+  type BuildStep = Context => Result[Context]
 
   def apply(): ContextBuilder =
     new ContextBuilder()

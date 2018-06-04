@@ -131,14 +131,14 @@ private[process] abstract class Phase(val description: String, connPool: Connect
     }
   }
 
-  private def handleQueryErrorsWith[B](handle: (Throwable) => B): PartialFunction[Throwable, B] = {
+  private def handleQueryErrorsWith[B](handle: Throwable => B): PartialFunction[Throwable, B] = {
     case e @ (_: BadRequestException |
               _: NotFoundException) =>
       handle(e)
 
     case e: UnknownException
       if e.getMessage.startsWith("request too large") ||
-        e.getMessage.startsWith("Unparsable service 413response") =>
+        e.getMessage.startsWith("Unparseable service 413 response") =>
       Log.warn("Request too large. Consider reducing the configured batch-size.")
       handle(e)
   }

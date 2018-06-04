@@ -60,7 +60,7 @@ final class ConfigBuilder {
 }
 
 object ConfigBuilder {
-  type BuildStep = (Config => Config)
+  type BuildStep = Config => Config
 
   def apply(): ConfigBuilder =
     new ConfigBuilder()

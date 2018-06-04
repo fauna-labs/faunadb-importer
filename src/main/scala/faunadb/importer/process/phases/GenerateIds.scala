@@ -4,7 +4,7 @@ import faunadb.importer.config._
 import faunadb.importer.lang._
 import faunadb.importer.persistence._
 import faunadb.importer.values._
-import faunadb.query.{ Expr, NextId }
+import faunadb.query.{ Expr, NewId }
 import faunadb.values.{ Value => FValue }
 
 private[process] object GenerateIds {
@@ -16,7 +16,7 @@ private[process] final class GenerateIds(cacheWrite: IdCache.Write, connPool: Co
   extends Phase("Pre-generating ids", connPool)
     with PreserveValues {
 
-  private val NextIdQuery = Ok(NextId()) // Avoid creating extra strings at each NextId call
+  private val NextIdQuery = Ok(NewId()) // Avoid creating extra strings at each NextId call
   protected def buildQuery(record: Record): Result[Expr] = NextIdQuery
 
   protected def handleResponse(record: Record, value: FValue): Result[Unit] = {

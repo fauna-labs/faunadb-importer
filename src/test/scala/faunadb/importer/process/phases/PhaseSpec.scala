@@ -95,7 +95,7 @@ class PhaseSpec
   it should "retry on bad request" in new RetryOn(new BadRequestException("bad request"))
   it should "retry on not round" in new RetryOn(new NotFoundException("not found"))
   it should "retry on request too large" in new RetryOn(new UnknownException("request too large"))
-  it should "retry on 413" in new RetryOn(new UnknownException("Unparsable service 413response"))
+  it should "retry on 413" in new RetryOn(new UnknownException("Unparseable service 413 response"))
   it should "backoff and retry on timeout" in new BackoffOn(new TimeoutException("time out"))
   it should "backoff and retry on unavailable" in new BackoffOn(new UnavailableException("unavailable"))
   it should "backoff and retry on remotely closed" in new BackoffOn(new IOException("Remotely closed"))

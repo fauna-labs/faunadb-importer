@@ -16,7 +16,7 @@ private[process] final class InsertRecords(cacheRead: IdCache.Read, connPool: Co
   extends Phase("Inserting records", connPool)
     with DiscardValues {
 
-  private val toFauna: (Record) => Result[FValue] = RecordConverter(cacheRead)
+  private val toFauna: Record => Result[FValue] = RecordConverter(cacheRead)
 
   protected def buildQuery(record: Record): Result[Expr] = {
     for {
@@ -27,11 +27,9 @@ private[process] final class InsertRecords(cacheRead: IdCache.Read, connPool: Co
       Insert(ref, ts, Action.Create, Obj("data" -> data))
   }
 
-  private def refFor(record: Record): Result[RefV] = {
+  private def refFor(record: Record): Result[Expr] = {
     cacheRead.get(c.clazz, record.id) map { newId =>
-      Ok(RefV(
-        s"classes/${c.clazz}/$newId"
-      ))
+      Ok(Ref(Class(c.clazz), newId))
     } getOrElse {
       Err(s"Could not find pre-generated id ${record.id} " +
         s"for record at ${record.localized}")
