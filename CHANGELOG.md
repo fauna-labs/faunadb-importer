@@ -1,4 +1,6 @@
-2.0.1-SNAPSHOT
+2.0.2-SNAPSHOT
+
+2.0.1
 * Upgrade faunadb-jvm driver to version 2.2.0
 
 2.0.0
