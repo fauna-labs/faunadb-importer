@@ -62,7 +62,7 @@ duplicating information.
 In order to map legacy IDs to newly generated Fauna IDs, the importer will:
 - Check if there is a field configured with the `ref` type. The field's value
   will be used as the lookup term for the new Fauna ID.
-- If no field is configured with the`ref` type, the importer will assign a
+- If no field is configured with the `ref` type, the importer will assign a
   sequential number for each record as the lookup term for the new Fauna ID.
 
 Once this phase completes, the pre-generated IDs will be stored at the `cache`
